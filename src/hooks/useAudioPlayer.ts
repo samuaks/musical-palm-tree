@@ -1,42 +1,44 @@
-import { useRef, useState, useEffect } from 'react'
+import {  useState, useEffect } from 'react'
 import { convertFileSrc } from '@tauri-apps/api/core'
 import { MediaFile } from '../types'
 
 export function useAudioPlayer(
   track: MediaFile | null,
+  mediaRef: React.RefObject<HTMLVideoElement | HTMLAudioElement>,
   onEnded?: () => void
 ) {
-  const audioRef = useRef<HTMLAudioElement>(new Audio())
   const [playing, setPlaying] = useState(false)
   const [duration, setDuration] = useState(0)
   const [currentTime, setCurrentTime] = useState(0)
   const [volume, setVolume] = useState(1)
 
-
   useEffect(() => {
     if (!track) return
-    audioRef.current.src = convertFileSrc(track.path)
-    audioRef.current.play()
+    const media = mediaRef.current
+    if (!media) return
+    media.src = convertFileSrc(track.path)
+    media.play()
     setPlaying(true)
     setCurrentTime(0)
     setDuration(0)
   }, [track])
 
   useEffect(() => {
-    const audio = audioRef.current
+    const media = mediaRef.current
+    if (!media) return
 
-    function handleMetadata() { setDuration(audio.duration) }
-    function handleTimeUpdate() { setCurrentTime(audio.currentTime) }
+    function handleMetadata() { setDuration(media.duration) }
+    function handleTimeUpdate() { setCurrentTime(media.currentTime) }
     function handleEnded() { setPlaying(false); onEnded?.() }
 
-    audio.addEventListener('loadedmetadata', handleMetadata)
-    audio.addEventListener('timeupdate', handleTimeUpdate)
-    audio.addEventListener('ended', handleEnded)
+    media.addEventListener('loadedmetadata', handleMetadata)
+    media.addEventListener('timeupdate', handleTimeUpdate)
+    media.addEventListener('ended', handleEnded)
 
     return () => {
-      audio.removeEventListener('loadedmetadata', handleMetadata)
-      audio.removeEventListener('timeupdate', handleTimeUpdate)
-      audio.removeEventListener('ended', handleEnded)
+      media.removeEventListener('loadedmetadata', handleMetadata)
+      media.removeEventListener('timeupdate', handleTimeUpdate)
+      media.removeEventListener('ended', handleEnded)
     }
   }, [onEnded])
 
@@ -50,8 +52,7 @@ export function useAudioPlayer(
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [playing])
-
-  useEffect(() => {
+   useEffect(() => {
     function handleSeek(e: KeyboardEvent) {
       if (e.code === 'ArrowRight' && e.target === document.body) {
         e.preventDefault()
@@ -82,23 +83,25 @@ export function useAudioPlayer(
   }, [volume])
 
   function toggle() {
-    if (playing) {
-      audioRef.current.pause()
-    } else {
-      audioRef.current.play()
-    }
+    const media = mediaRef.current
+    if (!media) return
+    if (playing) { media.pause() } else { media.play() }
     setPlaying(!playing)
   }
 
   function seek(time: number) {
-    audioRef.current.currentTime = time
+    const media = mediaRef.current
+    if (!media) return
+    media.currentTime = time
     setCurrentTime(time)
   }
 
   function changeVolume(v: number) {
-    audioRef.current.volume = v
+    const media = mediaRef.current
+    if (!media) return
+    media.volume = v
     setVolume(v)
   }
 
-  return { playing, duration, currentTime, toggle, seek, changeVolume, volume }
+  return { playing, duration, currentTime, toggle, seek, volume, changeVolume }
 }
