@@ -4,10 +4,12 @@ import { Track } from "./Track";
 interface TrackListProps {
     files: MediaFile[]
     currentTrack: MediaFile | null
+    query: string
     onPlay: (file: MediaFile) => void
+
 }
 
-export function TrackList({ files, currentTrack, onPlay }: TrackListProps) {
+export function TrackList({ files, currentTrack, query, onPlay }: TrackListProps) {
     if (files.length === 0) return null
 
    return (
@@ -16,6 +18,7 @@ export function TrackList({ files, currentTrack, onPlay }: TrackListProps) {
         <Track
           key={file.path}
           file={file}
+          query={query}
           onPlay={onPlay}
           isPlaying={currentTrack?.path === file.path}
         />

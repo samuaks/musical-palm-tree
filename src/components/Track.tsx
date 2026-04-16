@@ -1,26 +1,50 @@
-import { MediaFile } from "../types";
+import { Music, Video } from 'lucide-react'
+import { MediaFile } from '../types'
 
 interface TrackProps {
-    file: MediaFile
-    onPlay: (file: MediaFile) => void
-    isPlaying?: boolean
+  file: MediaFile
+  onPlay: (file: MediaFile) => void
+  isPlaying?: boolean
+  query: string
 }
 
-export function Track({ file, onPlay, isPlaying }: TrackProps) {
- return (
+const videoExts = ['mp4', 'mkv', 'webm', 'avi', 'mov']
+
+function highlight(text: string, query: string) {
+  if (!query) return <span>{text}</span>
+  const idx = text.toLowerCase().indexOf(query.toLowerCase())
+  if (idx === -1) return <span>{text}</span>
+
+  return (
+    <>
+      <span>{text.slice(0, idx)}</span>
+      <span className="text-teal-400 underline">{text.slice(idx, idx + query.length)}</span>
+      <span>{text.slice(idx + query.length)}</span>
+    </>
+  )
+}
+
+export function Track({ file, onPlay, isPlaying = false, query   }: TrackProps) {
+  const displayName = file.name.replace(/\.[^/.]+$/, '') 
+  const isVideo = videoExts.includes(file.ext.toLowerCase())
+
+  return (
     <div
       onClick={() => onPlay(file)}
-      className={`flex items-center gap-3 px-4 py-2 rounded-lg cursor-pointer hover:bg-zinc-800 transition-colors ${
-        isPlaying ? 'bg-zinc-700' : ''
+      className={`flex flex-col px-6 py-2 cursor-pointer hover:bg-white/5 transition-colors ${
+        isPlaying ? 'border-l-2 border-teal-400' : 'border-l-2 border-transparent'
       }`}
     >
-      <div className="text-zinc-400 text-sm w-4">
-        {isPlaying ? '▶' : '♪'}
+    
+      <span className={`text-sm font-mono ${isPlaying ? 'text-teal-400' : 'text-slate-300'}`}>
+        {highlight(displayName, query)}
+      </span>
+        <div className="text-slate-500">
+        {isVideo ? <Video size={14} />:  <Music size={14} />}
       </div>
-      <div className="flex flex-col flex-1 min-w-0">
-        <span className="text-sm text-white truncate">{file.name}</span>
-        <span className="text-xs text-zinc-400 uppercase">{file.ext}</span>
-      </div>
+      <span className="text-xs font-mono text-slate-500">
+        {/*isPlaying ? '▶ ' : ''}{file.ext.toUpperCase()*/}
+      </span>
     </div>
   )
-} 
+}

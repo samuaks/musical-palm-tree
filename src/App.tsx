@@ -2,32 +2,43 @@ import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import "./App.css";
 import { Directory } from "./types";
-import { TrackList } from "./components/TrackList";
+import { Header } from "./components/Header";
+import { Library } from "./components/Library";
+import { PlayerBar } from "./components/PlayerBar";
+import { usePlayer } from "./hooks/usePlayer";
 
 function App() {
   const [dirs, setDirs] = useState<Directory[]>([]);
+  const [query, setQuery] = useState('');
 
   useEffect(() => {
     invoke<Directory[]>("scan_media").then(setDirs)  
   }, []);
 
+  const {
+    currentTrack,
+    next,
+    play,
+    prev
+  } = usePlayer(dirs)
+
   
   return (
-    <>
-       {dirs.map(dir => (
-        <div className="bg-gray-500" key={dir.path}>
-          <h1 className="text-2xl font-bold mb-4">{dir.name}</h1>
-          <TrackList files={dir.files} currentTrack={null} onPlay={() => {}} />
-          {dir.albums.map(album => (
-            <div key={album.name} className="mt-6">
-              <h2 key={album.name} className="text-xl font-semibold mt-6 mb-2">{album.name}</h2>
-              <TrackList files={album.files} currentTrack={null} onPlay={() => {}} />
-            </div>
-          ))}
-        </div>
-       ))}
-      </>
-  );
-}
+  <div className="bg-slate-800 h-screen font-mono flex flex-col">
+  
+  {/* header */}
+  <Header query={query} onSearch={setQuery} />
+  {/* library */}
+  <Library currentTrack={currentTrack} dirs={dirs} onPlay={play} query={query} />
 
+    <PlayerBar 
+      track={currentTrack}
+      onNext={next}
+      onPrev={prev}
+    />
+
+  </div>
+
+  )
+}
 export default App;
