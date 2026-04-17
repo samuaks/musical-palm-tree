@@ -26,9 +26,8 @@ function App() {
   return (
   <div className="bg-slate-800 h-screen font-mono flex flex-col">
   
-  {/* header */}
   <Header query={query} onSearch={setQuery} />
-  {/* library */}
+
   <Library currentTrack={currentTrack} dirs={dirs} onPlay={play} query={query} />
 
     <PlayerBar 
