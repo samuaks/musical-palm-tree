@@ -8,3 +8,7 @@ This template should help get you started developing with Tauri, React and Types
 
 ## Releases
 Github action to create artifacts for different platforms
+Again for new release
+
+## Branch purpose
+> this branch is only for releases, no real work should be done here
