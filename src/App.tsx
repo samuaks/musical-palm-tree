@@ -10,9 +10,13 @@ import { usePlayer } from "./hooks/usePlayer";
 function App() {
   const [dirs, setDirs] = useState<Directory[]>([]);
   const [query, setQuery] = useState('');
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    invoke<Directory[]>("scan_media").then(setDirs)  
+    invoke<Directory[]>("scan_media").then(r => {
+      setDirs(r)
+      setLoading(false)
+    })  
   }, []);
 
   const {
@@ -28,7 +32,9 @@ function App() {
   
   <Header query={query} onSearch={setQuery} />
 
-  <Library currentTrack={currentTrack} dirs={dirs} onPlay={play} query={query} />
+  <Library
+  loading={loading}
+  currentTrack={currentTrack} dirs={dirs} onPlay={play} query={query} />
 
     <PlayerBar 
       track={currentTrack}
