@@ -1,4 +1,5 @@
 import { Directory, MediaFile } from '../types'
+import { AlbumSkeleton } from './Skeleton'
 import { TrackList } from './TrackList'
 
 interface LibraryProps {
@@ -6,6 +7,7 @@ interface LibraryProps {
   query: string
   currentTrack: MediaFile | null
   onPlay: (file: MediaFile) => void
+  loading?: boolean
 }
 
 function filterDirs(dirs: Directory[], query: string): Directory[] {
@@ -29,8 +31,20 @@ function filterDirs(dirs: Directory[], query: string): Directory[] {
   }, [])
 }
 
-export function Library({ dirs, query, currentTrack, onPlay }: LibraryProps) {
+export function Library({ dirs, query, currentTrack, onPlay, loading }: LibraryProps) {
   const filtered = filterDirs(dirs, query)
+
+
+    if (loading) {
+    return (
+      <div className="flex-1 overflow-y-auto py-2">
+        {Array.from({length: 3}).map((_, i) => (
+          <AlbumSkeleton key={i} />
+        ))}
+      </div>
+    )
+  }
+  
 
   return (
     <div className="flex-1 overflow-y-auto py-2">

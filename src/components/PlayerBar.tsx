@@ -45,6 +45,8 @@ export function PlayerBar({ track, onNext, onPrev }: PlayerBarProps) {
   const displayName = track?.name.replace(/\.[^/.]+$/, '') ?? 'No track selected'
   const VolumeIcon = volume === 0 ? VolumeX : volume < 0.5 ? Volume1 : Volume2
 
+
+
   return (
    <div className={`shrink-0 border-t border-slate-700 transition-all duration-300 ${
   expanded ? 'h-128' : 'h-14'
