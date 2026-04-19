@@ -1,6 +1,8 @@
 import { useState, useMemo } from 'react'
 import { Directory, MediaFile } from '../types'
 
+
+
 export function usePlayer(dirs: Directory[]) {
   const [currentTrack, setCurrentTrack] = useState<MediaFile | null>(null)
 
