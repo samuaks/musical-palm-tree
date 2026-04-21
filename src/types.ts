@@ -2,6 +2,8 @@ export interface MediaFile {
   path: string
   name: string
   ext: string
+  duration_secs: number
+  size_bytes: number
 }
 
 export interface Album {

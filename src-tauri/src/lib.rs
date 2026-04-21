@@ -3,6 +3,8 @@ use walkdir::WalkDir;
 use std::io::{Read, Seek, SeekFrom};
 use std::collections::HashMap;
 use tauri::Emitter;
+use lofty::probe::Probe;
+use lofty::prelude::AudioFile;
 
 
 
@@ -10,7 +12,9 @@ use tauri::Emitter;
 pub struct MediaFile {
     path: String,
     name: String,
-    ext: String
+    ext: String,
+    duration_secs: f64,
+    size_bytes: u64
 }
 
 #[derive(serde::Serialize)]
@@ -56,6 +60,18 @@ fn partial_hash(path: &str) -> Option<String> {
     Some(format!("{:x}", md5::compute(&buf)))
 }
 
+fn read_duration(path: &str) -> f64 {
+    Probe::open(path)
+        .ok()
+        .and_then(|p| p.guess_file_type().ok())
+        .and_then(|f| f.read().ok())
+        .map(|t| t.properties().duration().as_secs_f64())
+        .unwrap_or(0.0)
+}
+
+fn read_size(path: &str) -> u64 {
+    std::fs::metadata(path).map(|m| m.len()).unwrap_or(0)
+}
 
 #[tauri::command]
 async fn scan_media(app: tauri::AppHandle) -> ScanResult {
@@ -99,6 +115,8 @@ async fn scan_media(app: tauri::AppHandle) -> ScanResult {
                 path: e.path().to_string_lossy().to_string(),
                 name: e.file_name().to_string_lossy().to_string(),
                 ext,
+                duration_secs: read_duration(e.path().to_str().unwrap_or("")),
+                size_bytes: read_size(e.path().to_str().unwrap_or(""))
             };
 
             if let Some(hash) = partial_hash(e.path().to_str().unwrap_or("")) {
