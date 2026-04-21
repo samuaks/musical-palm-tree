@@ -26,6 +26,7 @@ export function PlayerBar({ track, onNext, onPrev }: PlayerBarProps) {
   const displayName = track?.name.replace(/\.[^/.]+$/, '') ?? 'No track selected'
 
   useEffect(() => {
+    if (!convertedSrc) return
     if (convertedSrc) generateWaveform(convertedSrc)
   }, [convertedSrc])
 
