@@ -1,22 +1,31 @@
-import { ScanMetaData } from "../types"
+import { ScanMetaData, ScanState } from "../types"
 
 interface HeaderProps {
   query: string
   onSearch: (q: string) => void
-  metaData: ScanMetaData | null
+  scanMeta: ScanMetaData | null
+  scanState: ScanState
 }
 
-export function Header({ query, onSearch, metaData }: HeaderProps) {
+export function Header({ query, onSearch, scanMeta, scanState }: HeaderProps) {
   return (
     <div className="shrink-0 px-4 pt-4 pb-3 border-b border-slate-700">
       <span className="text-teal-400 font-bold tracking-wide text-sm">
         PlayMusic
       </span>
-         {metaData && (
-        <div className="text-xs text-slate-500 font-mono mt-1">
-          {metaData.total_files} files · {metaData.total_albums} albums · {metaData.total_directories} dirs · {metaData.duration_ms}ms
-        </div>
-      )}
+          <div className="text-xs font-mono mt-1">
+        {scanState === 'scanning' && !scanMeta && (
+          <span className="text-slate-600 animate-pulse">scanning library...</span>
+        )}
+        {scanMeta && (
+          <span className="text-slate-500">
+            {scanMeta.total_files} files · {scanMeta.total_albums} albums · {scanMeta.total_directories} dirs · {scanMeta.duration_ms}ms
+            {scanMeta.total_duplicates > 0 && (
+              <span className="text-amber-600 ml-2">· {scanMeta.total_duplicates} duplicates</span>
+            )}
+          </span>
+        )}
+      </div>
       <div className="flex items-center gap-2 mt-3">
         <span className="text-teal-400 text-sm">{'>'}</span>
         <input

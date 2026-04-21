@@ -21,8 +21,12 @@ export interface ScanMetaData {
   total_files: number
   total_albums: number
   total_directories: number
+  total_duplicates: number
 }
 export interface ScanResult {
   metadata: ScanMetaData
   directories: Directory[]
+  duplicates: string[][]
 }
+
+export type ScanState = 'idle' | 'scanning' | 'done'

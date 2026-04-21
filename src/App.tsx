@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import {listen} from "@tauri-apps/api/event";
 import "./App.css";
-import { Directory, ScanMetaData, ScanResult } from "./types";
+import { Directory, ScanMetaData, ScanResult, ScanState } from "./types";
 import { Header } from "./components/Header";
 import { Library } from "./components/Library";
 import { PlayerBar } from "./components/PlayerBar";
@@ -11,14 +12,27 @@ function App() {
   const [scanMeta, setScanMeta] = useState<ScanMetaData | null>(null);
   const [dirs, setDirs] = useState<Directory[]>([]);
   const [query, setQuery] = useState('');
-  const [loading, setLoading] = useState(true);
+  const [scanState, setScanState] = useState<ScanState>('idle');
 
   useEffect(() => {
+    setScanState('scanning')
+
+    // mount listener
+    const unlisten = listen<Directory[]>('scan_progress', event => {
+      setDirs(event.payload)
+    })
+
+
     invoke<ScanResult>("scan_media").then(r => {
       setDirs(r.directories)
       setScanMeta(r.metadata)
-      setLoading(false)
+      setScanState('done')
     })  
+
+    // unmount listener on cleanup
+    return () => {
+      unlisten.then(f => f())
+    }
   }, []);
 
   const {
@@ -30,12 +44,13 @@ function App() {
 
   return (
   <div className="bg-slate-800 h-screen font-mono flex flex-col overflow-hidden">
-  <Header query={query} onSearch={setQuery} 
-    metaData={scanMeta}
+  <Header query={query}
+  scanState={scanState}
+  onSearch={setQuery} 
+    scanMeta={scanMeta}
   />
   <Library
-  loading={loading}
-  currentTrack={currentTrack} dirs={dirs} onPlay={play} query={query} />
+  scanState={scanState}  currentTrack={currentTrack} dirs={dirs} onPlay={play} query={query} />
   
   <PlayerBar 
     track={currentTrack}
