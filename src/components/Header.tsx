@@ -14,8 +14,13 @@ export function Header({ query, onSearch, scanMeta, scanState }: HeaderProps) {
         PlayMusic
       </span>
           <div className="text-xs font-mono mt-1">
-        {scanState === 'scanning' && !scanMeta && (
-          <span className="text-slate-600 animate-pulse">scanning library...</span>
+       {scanState === 'scanning' && !scanMeta && (
+            <div className="flex items-center gap-2 mt-1">
+              <div className="w-1.5 h-1.5 rounded-full bg-teal-400 animate-pulse" />
+              <span className="text-xs text-slate-500 font-mono animate-pulse">
+                scanning library...
+              </span>
+            </div>
         )}
         {scanMeta && (
           <span className="text-slate-500">
