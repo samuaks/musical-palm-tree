@@ -2,8 +2,11 @@ import { useState, useEffect, useRef } from 'react'
 import { convertFileSrc } from '@tauri-apps/api/core'
 import { MediaFile } from '../types'
 
+const videoExts = ['mp4', 'mkv', 'webm', 'avi', 'mov']
+
 export function useAudioPlayer(
   track: MediaFile | null,
+  videoRef: React.RefObject<HTMLVideoElement | null>,
   onEnded?: () => void
 ) {
   const audioRef = useRef<HTMLAudioElement>(new Audio())
@@ -11,45 +14,58 @@ export function useAudioPlayer(
   const [duration, setDuration] = useState(0)
   const [currentTime, setCurrentTime] = useState(0)
   const [volume, setVolume] = useState(1)
-  const previousVolume = useRef(1)
+  const prevVolume = useRef(1)
+  const [convertedSrc, setConvertedSrc] = useState<string>('')
 
-  useEffect(() => {
+  const isVideo = track ? videoExts.includes(track.ext.toLowerCase()) : false
+
+  // pick the right element based on track type
+  function getMedia(): HTMLAudioElement | HTMLVideoElement {
+    if (isVideo && videoRef.current) return videoRef.current
+    return audioRef.current
+  }
+
+useEffect(() => {
   if (!track) return
+
+  // pause both elements before switching
+  audioRef.current.pause()
+  if (videoRef.current) videoRef.current.pause()
+
   const src = convertFileSrc(track.path)
-  const audio = audioRef.current
-  audio.pause()        
-  audio.src = src
-  audio.load()         
+  setConvertedSrc(src)
+  const media = getMedia()
+  media.src = src
+  media.load()
   setCurrentTime(0)
   setDuration(0)
+  setPlaying(false)
 
-  const playPromise = audio.play()
+  const playPromise = media.play()
   if (playPromise) {
     playPromise
       .then(() => setPlaying(true))
-      .catch(e => {
-        if (e.name !== 'AbortError') console.error(e)
-      })
+      .catch(e => { if (e.name !== 'AbortError') console.error(e) })
   }
 }, [track])
 
   useEffect(() => {
-    const audio = audioRef.current
+    const media = getMedia()
 
-    function handleMetadata() { setDuration(audio.duration) }
-    function handleTimeUpdate() { setCurrentTime(audio.currentTime) }
+    function handleMetadata() { setDuration(media.duration) }
+    function handleTimeUpdate() { setCurrentTime(media.currentTime) }
     function handleEnded() { setPlaying(false); onEnded?.() }
 
-    audio.addEventListener('loadedmetadata', handleMetadata)
-    audio.addEventListener('timeupdate', handleTimeUpdate)
-    audio.addEventListener('ended', handleEnded)
+    media.addEventListener('loadedmetadata', handleMetadata)
+    media.addEventListener('timeupdate', handleTimeUpdate)
+    media.addEventListener('ended', handleEnded)
 
     return () => {
-      audio.removeEventListener('loadedmetadata', handleMetadata)
-      audio.removeEventListener('timeupdate', handleTimeUpdate)
-      audio.removeEventListener('ended', handleEnded)
+      media.removeEventListener('loadedmetadata', handleMetadata)
+      media.removeEventListener('timeupdate', handleTimeUpdate)
+      media.removeEventListener('ended', handleEnded)
     }
-  }, [onEnded])
+  }, [track, onEnded])
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -66,31 +82,37 @@ export function useAudioPlayer(
   }, [playing, currentTime, duration, volume])
 
   function toggle() {
-    const audio = audioRef.current
-    if (playing) { audio.pause() } else { audio.play() }
+    const media = getMedia()
+    if (playing) { media.pause() } else {
+      media.play()
+        .then(() => setPlaying(true))
+        .catch(e => { if (e.name !== 'AbortError') console.error(e) })
+      return
+    }
     setPlaying(!playing)
   }
 
   function seek(time: number) {
-    audioRef.current.currentTime = time
+    const media = getMedia()
+    media.currentTime = time
     setCurrentTime(time)
   }
 
   function changeVolume(v: number) {
-    audioRef.current.volume = v
-    if (v > 0) previousVolume.current = v
+    const media = getMedia()
+    media.volume = v
+    if (v > 0) prevVolume.current = v
     setVolume(v)
   }
 
   function toggleMute() {
     if (volume === 0) {
-      changeVolume(previousVolume.current)
-    }
-    else {
-      previousVolume.current = volume
+      changeVolume(prevVolume.current)
+    } else {
+      prevVolume.current = volume
       changeVolume(0)
     }
   }
 
-  return { playing, duration, currentTime, toggle, seek, volume, changeVolume, toggleMute }
+  return { playing, duration, currentTime, toggle, seek, volume, changeVolume, toggleMute, convertedSrc, isVideo }
 }
