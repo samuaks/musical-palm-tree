@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import {listen} from "@tauri-apps/api/event";
 import "./App.css";
@@ -7,12 +7,15 @@ import { Header } from "./components/Header";
 import { Library } from "./components/Library";
 import { PlayerBar } from "./components/PlayerBar";
 import { usePlayer } from "./hooks/usePlayer";
+import { filterDirs } from "./utils/filterDirs";
 
 function App() {
   const [scanMeta, setScanMeta] = useState<ScanMetaData | null>(null);
   const [dirs, setDirs] = useState<Directory[]>([]);
   const [query, setQuery] = useState('');
   const [scanState, setScanState] = useState<ScanState>('idle');
+
+  const filteredDirs = useMemo(() => filterDirs(dirs, query), [dirs, query])
 
   useEffect(() => {
     setScanState('scanning')
@@ -50,7 +53,7 @@ function App() {
     scanMeta={scanMeta}
   />
   <Library
-  scanState={scanState}  currentTrack={currentTrack} dirs={dirs} onPlay={play} query={query} />
+  scanState={scanState}  currentTrack={currentTrack} dirs={filteredDirs} onPlay={play} query={query} />
   
   <PlayerBar 
     track={currentTrack}

@@ -10,29 +10,10 @@ interface LibraryProps {
   scanState: ScanState
 }
 
-function filterDirs(dirs: Directory[], query: string): Directory[] {
-  if (!query) return dirs
-  const q = query.toLowerCase()
 
-  return dirs.reduce<Directory[]>((acc, dir) => {
-    const filteredFiles = dir.files.filter(f =>
-      f.name.toLowerCase().includes(q)
-    )
-    const filteredAlbums = dir.albums.reduce<typeof dir.albums>((aalc, album) => {
-      const files = album.files.filter(f => f.name.toLowerCase().includes(q))
-      if (files.length > 0) aalc.push({ ...album, files })
-      return aalc
-    }, [])
-
-    if (filteredFiles.length > 0 || filteredAlbums.length > 0) {
-      acc.push({ ...dir, files: filteredFiles, albums: filteredAlbums })
-    }
-    return acc
-  }, [])
-}
 
 export function Library({ dirs, query, currentTrack, onPlay, scanState }: LibraryProps) {
-  const filtered = filterDirs(dirs, query)
+  const filtered = dirs
 
 
  if (scanState === 'scanning' && dirs.length === 0) {
