@@ -1,3 +1,5 @@
+import { ChevronDown, ChevronRight } from 'lucide-react'
+import { useCollapsed } from '../hooks/useCollapsed'
 import { Directory, MediaFile, ScanState } from '../types'
 import { AlbumSkeleton } from './Skeleton'
 import { TrackList } from './TrackList'
@@ -14,6 +16,8 @@ interface LibraryProps {
 
 export function Library({ dirs, query, currentTrack, onPlay, scanState }: LibraryProps) {
   const filtered = dirs
+
+  const {isCollapsed, toggle} = useCollapsed()
 
 
  if (scanState === 'scanning' && dirs.length === 0) {
@@ -53,21 +57,40 @@ export function Library({ dirs, query, currentTrack, onPlay, scanState }: Librar
             query={query}
           />
 
-          {dir.albums.map(album => (
-            <div key={album.name}>
-              <div className="pl-8 py-1 text-xs text-slate-400 tracking-wide mt-2">
-                {album.name}
-              </div>
-              <div className="pl-4">
-                <TrackList
+          {dir.albums.map(album => {
+            const key = `${dir.path}/${album.name}`
+            const collapsed = isCollapsed(key)
+             return (
+              <div key={album.name}>
+                <div
+                  onClick={() => toggle(key)}
+                  className="flex items-center gap-1 pl-4 pr-4 py-1 mt-2 cursor-pointer hover:bg-white/5 transition-colors"
+                >
+                  <div className="text-slate-600">
+                    {collapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
+                  </div>
+                  <span className="text-xs text-slate-400 tracking-wide">
+                    {album.name}
+                  </span>
+                  <span className="ml-2 text-xs text-slate-600 font-mono">
+                    {album.files.length}
+                  </span>
+                </div>
+
+                <div className={`pl-4 overflow-hidden transition-all duration-200 ${
+                  collapsed ? 'max-h-0' : 'max-h-2499.75'
+                }`}>
+                  <TrackList
+                    files={album.files}
+                    currentTrack={currentTrack}
+                    onPlay={onPlay}
                     query={query}
-                  files={album.files}
-                  currentTrack={currentTrack}
-                  onPlay={onPlay}
-                />
+                  />
+                </div>
               </div>
-            </div>
-          ))}
+            )
+          }
+          )}
         </div>
       ))}
     </div>
