@@ -24,27 +24,44 @@ function highlight(text: string, query: string) {
   )
 }
 
+function formatDuration(seconds: number) {
+  if (seconds === 0) return '--:--'
+  const minutes = Math.floor(seconds / 60)
+  const remainingSeconds = Math.floor(seconds % 60)
+  return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`
+}
+
+function formatSize(bytes: number) {
+  if (bytes === 0) return ''
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)}KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)}MB`
+}
+
 export function Track({ file, onPlay, isPlaying = false, query   }: TrackProps) {
   const displayName = file.name.replace(/\.[^/.]+$/, '') 
   const isVideo = videoExts.includes(file.ext.toLowerCase())
 
-  return (
-    <div
-      onClick={() => onPlay(file)}
-      className={`flex flex-col px-6 py-2 cursor-pointer hover:bg-white/5 transition-colors ${
-        isPlaying ? 'border-l-2 border-teal-400' : 'border-l-2 border-transparent'
-      }`}
-    >
-    
-      <span className={`text-sm font-mono ${isPlaying ? 'text-teal-400' : 'text-slate-300'}`}>
-        {highlight(displayName, query)}
-      </span>
-        <div className="text-slate-500">
-        {isVideo ? <Video size={14} />:  <Music size={14} />}
-      </div>
-      <span className="text-xs font-mono text-slate-500">
-        {/*isPlaying ? '▶ ' : ''}{file.ext.toUpperCase()*/}
-      </span>
+return (
+  <div
+    onClick={() => onPlay(file)}
+    className={`flex items-center gap-3 px-6 py-1.5 cursor-pointer hover:bg-white/5 transition-colors ${
+      isPlaying ? 'border-l-2 border-teal-400' : 'border-l-2 border-transparent'
+    }`}
+  >
+    <div className="text-slate-600 shrink-0">
+      {isVideo ? <Video size={12} /> : <Music size={12} />}
     </div>
-  )
+
+    <span className={`text-sm font-mono flex-1 truncate min-w-0 ${isPlaying ? 'text-teal-400' : 'text-slate-300'}`}>
+      {highlight(displayName, query)}
+    </span>
+
+   <span className="text-xs font-mono text-slate-600 shrink-0 w-10 text-right">
+      {formatDuration(file.duration_secs)}
+  </span>
+  <span className="text-xs font-mono text-slate-600 shrink-0 w-16 text-right">
+     {formatSize(file.size_bytes)}
+  </span>
+  </div>
+)
 }

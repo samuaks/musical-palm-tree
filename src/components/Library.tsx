@@ -1,4 +1,4 @@
-import { Directory, MediaFile } from '../types'
+import { Directory, MediaFile, ScanState } from '../types'
 import { AlbumSkeleton } from './Skeleton'
 import { TrackList } from './TrackList'
 
@@ -7,7 +7,7 @@ interface LibraryProps {
   query: string
   currentTrack: MediaFile | null
   onPlay: (file: MediaFile) => void
-  loading?: boolean
+  scanState: ScanState
 }
 
 function filterDirs(dirs: Directory[], query: string): Directory[] {
@@ -31,26 +31,31 @@ function filterDirs(dirs: Directory[], query: string): Directory[] {
   }, [])
 }
 
-export function Library({ dirs, query, currentTrack, onPlay, loading }: LibraryProps) {
+export function Library({ dirs, query, currentTrack, onPlay, scanState }: LibraryProps) {
   const filtered = filterDirs(dirs, query)
 
 
-    if (loading) {
+ if (scanState === 'scanning' && dirs.length === 0) {
     return (
       <div className="flex-1 overflow-y-auto py-2">
-        {Array.from({length: 3}).map((_, i) => (
+        {Array.from({ length: 3 }).map((_, i) => (
           <AlbumSkeleton key={i} />
         ))}
       </div>
     )
   }
-  
 
   return (
     <div className="flex-1 overflow-y-auto py-2">
-      {filtered.length === 0 && (
+      {scanState === 'scanning' && (
+        <div className="px-4 py-1 text-xs text-slate-600 font-mono animate-pulse">
+          scanning...
+        </div>
+      )}
+
+      {filtered.length === 0 && scanState === 'done' && (
         <div className="px-4 py-3 text-xs text-slate-600 font-mono">
-          {query ? 'no results.' : 'scanning...'}
+          {query ? 'no results.' : 'no media found.'}
         </div>
       )}
 
