@@ -1,107 +1,86 @@
-import {  useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { convertFileSrc } from '@tauri-apps/api/core'
 import { MediaFile } from '../types'
 
 export function useAudioPlayer(
   track: MediaFile | null,
-  mediaRef: React.RefObject<HTMLVideoElement | HTMLAudioElement>,
   onEnded?: () => void
 ) {
+  const audioRef = useRef<HTMLAudioElement>(new Audio())
   const [playing, setPlaying] = useState(false)
   const [duration, setDuration] = useState(0)
   const [currentTime, setCurrentTime] = useState(0)
   const [volume, setVolume] = useState(1)
+  const [convertedSrc, setConvertedSrc] = useState<string>('')
 
   useEffect(() => {
-    if (!track) return
-    const media = mediaRef.current
-    if (!media) return
-    media.src = convertFileSrc(track.path)
-    media.play()
-    setPlaying(true)
-    setCurrentTime(0)
-    setDuration(0)
-  }, [track])
+  if (!track) return
+  const src = convertFileSrc(track.path)
+  setConvertedSrc(src)
+  const audio = audioRef.current
+  audio.pause()        
+  audio.src = src
+  audio.load()         
+  setCurrentTime(0)
+  setDuration(0)
+
+  const playPromise = audio.play()
+  if (playPromise) {
+    playPromise
+      .then(() => setPlaying(true))
+      .catch(e => {
+        if (e.name !== 'AbortError') console.error(e)
+      })
+  }
+}, [track])
 
   useEffect(() => {
-    const media = mediaRef.current
-    if (!media) return
+    const audio = audioRef.current
 
-    function handleMetadata() { setDuration(media.duration) }
-    function handleTimeUpdate() { setCurrentTime(media.currentTime) }
+    function handleMetadata() { setDuration(audio.duration) }
+    function handleTimeUpdate() { setCurrentTime(audio.currentTime) }
     function handleEnded() { setPlaying(false); onEnded?.() }
 
-    media.addEventListener('loadedmetadata', handleMetadata)
-    media.addEventListener('timeupdate', handleTimeUpdate)
-    media.addEventListener('ended', handleEnded)
+    audio.addEventListener('loadedmetadata', handleMetadata)
+    audio.addEventListener('timeupdate', handleTimeUpdate)
+    audio.addEventListener('ended', handleEnded)
 
     return () => {
-      media.removeEventListener('loadedmetadata', handleMetadata)
-      media.removeEventListener('timeupdate', handleTimeUpdate)
-      media.removeEventListener('ended', handleEnded)
+      audio.removeEventListener('loadedmetadata', handleMetadata)
+      audio.removeEventListener('timeupdate', handleTimeUpdate)
+      audio.removeEventListener('ended', handleEnded)
     }
   }, [onEnded])
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
-      if (e.code === 'Space' && e.target === document.body) {
-        e.preventDefault()
-        toggle()
-      }
+      if (e.target !== document.body) return
+      e.preventDefault()
+      if (e.code === 'Space') toggle()
+      if (e.code === 'ArrowRight') seek(Math.min(duration, currentTime + 5))
+      if (e.code === 'ArrowLeft') seek(Math.max(0, currentTime - 5))
+      if (e.code === 'ArrowUp') changeVolume(Math.min(1, volume + 0.1))
+      if (e.code === 'ArrowDown') changeVolume(Math.max(0, volume - 0.1))
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [playing])
-   useEffect(() => {
-    function handleSeek(e: KeyboardEvent) {
-      if (e.code === 'ArrowRight' && e.target === document.body) {
-        e.preventDefault()
-        seek(Math.min(duration, currentTime + 5))
-      }
-      if (e.code === 'ArrowLeft' && e.target === document.body) {
-        e.preventDefault()
-        seek(Math.max(0, currentTime - 5))
-      }
-    }
-    window.addEventListener('keydown', handleSeek)
-    return () => window.removeEventListener('keydown', handleSeek)
-  }, [currentTime, duration])
-
-  useEffect(() => {
-    function handleVolumeChange(e: KeyboardEvent) {
-      if (e.code === 'ArrowUp' && e.target === document.body) {
-        e.preventDefault()
-        changeVolume(Math.min(1, volume + 0.1))
-      }
-      if (e.code === 'ArrowDown' && e.target === document.body) {
-        e.preventDefault()
-        changeVolume(Math.max(0, volume - 0.1))
-      }
-    }
-    window.addEventListener('keydown', handleVolumeChange)
-    return () => window.removeEventListener('keydown', handleVolumeChange)
-  }, [volume])
+  }, [playing, currentTime, duration, volume])
 
   function toggle() {
-    const media = mediaRef.current
-    if (!media) return
-    if (playing) { media.pause() } else { media.play() }
+    const audio = audioRef.current
+    if (playing) { audio.pause() } else { audio.play() }
     setPlaying(!playing)
   }
 
   function seek(time: number) {
-    const media = mediaRef.current
-    if (!media) return
-    media.currentTime = time
+    audioRef.current.currentTime = time
     setCurrentTime(time)
   }
 
   function changeVolume(v: number) {
-    const media = mediaRef.current
-    if (!media) return
-    media.volume = v
+    audioRef.current.volume = v
     setVolume(v)
   }
 
-  return { playing, duration, currentTime, toggle, seek, volume, changeVolume }
+  return { playing, duration, currentTime, toggle, seek, volume, changeVolume, convertedSrc }
 }

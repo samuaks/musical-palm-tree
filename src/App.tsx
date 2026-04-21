@@ -26,22 +26,18 @@ function App() {
     prev
   } = usePlayer(dirs)
 
-  
   return (
-  <div className="bg-slate-800 h-screen font-mono flex flex-col">
-  
+  <div className="bg-slate-800 h-screen font-mono flex flex-col overflow-hidden">
   <Header query={query} onSearch={setQuery} />
-
   <Library
   loading={loading}
   currentTrack={currentTrack} dirs={dirs} onPlay={play} query={query} />
-
-    <PlayerBar 
-      track={currentTrack}
-      onNext={next}
-      onPrev={prev}
-    />
-
+  
+  <PlayerBar 
+    track={currentTrack}
+    onNext={next}
+    onPrev={prev}
+  />
   </div>
 
   )
