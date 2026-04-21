@@ -25,8 +25,23 @@ pub struct Directory {
     files: Vec<MediaFile>
 }
 
+#[derive(serde::Serialize)]
+pub struct ScanMetaData {
+    duration_ms: u128,
+    total_files: usize,
+    total_albums: usize,
+    total_directories: usize
+}
+
+#[derive(serde::Serialize)]
+pub struct ScanResult {
+    metadata: ScanMetaData,
+    directories: Vec<Directory>
+}
+
 #[tauri::command]
-fn scan_media() -> Vec<Directory> {
+fn scan_media() -> ScanResult {
+    let start = std::time::Instant::now();
     let audio_ext = ["mp3", "flac", "wav", "aac", "ogg"];
     let video_ext = ["mp4", "mkv", "webm", "avi", "mov"];
 
@@ -90,9 +105,17 @@ fn scan_media() -> Vec<Directory> {
             }
         });
 
-        let mut result: Vec<Directory> = groups.into_values().collect();
-        result.sort_by(|a, b| a.name.cmp(&b.name));
-        result
+        let mut directories: Vec<Directory> = groups.into_values().collect();
+        directories.sort_by(|a, b| a.name.cmp(&b.name));
+
+        let total_files = directories.iter().map(|d| d.files.len() + d.albums.iter().map(|a| a.files.len()).sum::<usize>()).sum();
+        let total_albums = directories.iter().map(|d| d.albums.len()).sum();
+        let total_directories = directories.len();
+
+        ScanResult {
+            metadata: ScanMetaData { duration_ms: start.elapsed().as_millis(), total_files, total_albums, total_directories },
+            directories
+        }
 
 
 }

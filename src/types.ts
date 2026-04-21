@@ -15,3 +15,14 @@ export interface Directory {
   albums: Album[]
   files: MediaFile[]
 }
+
+export interface ScanMetaData {
+  duration_ms : number
+  total_files: number
+  total_albums: number
+  total_directories: number
+}
+export interface ScanResult {
+  metadata: ScanMetaData
+  directories: Directory[]
+}
