@@ -21,7 +21,7 @@ function formatTime(s: number) {
 
 
 export function PlayerBar({ track, onNext, onPrev }: PlayerBarProps) {
-  const { playing, duration, currentTime, toggle, seek, changeVolume,volume } = useAudioPlayer(track, onNext)
+  const { playing, duration, currentTime, toggle, seek, changeVolume,volume, toggleMute } = useAudioPlayer(track, onNext)
   const { waveformData, generateWaveform, loading } = useWaveform()
   const displayName = track?.name.replace(/\.[^/.]+$/, '') ?? 'No track selected'
 
@@ -66,7 +66,7 @@ useEffect(() => {
         </div>
         <div className="flex items-center gap-2">
     <button
-      onClick={() => changeVolume(volume === 0 ? 1 : 0)}
+      onClick={toggleMute}
       tabIndex={-1}
       onMouseUp={e => (e.target as HTMLInputElement).blur()}
       className="text-slate-500 hover:text-slate-300 transition-colors"
@@ -80,6 +80,8 @@ useEffect(() => {
       step={0.01}
       value={volume}
       onChange={e => changeVolume(Number(e.target.value))}
+      onMouseUp={e => (e.target as HTMLInputElement).blur()}
+  
       className="w-16 accent-teal-400"
     />
   </div>

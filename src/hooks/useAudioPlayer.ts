@@ -11,6 +11,7 @@ export function useAudioPlayer(
   const [duration, setDuration] = useState(0)
   const [currentTime, setCurrentTime] = useState(0)
   const [volume, setVolume] = useState(1)
+  const previousVolume = useRef(1)
 
   useEffect(() => {
   if (!track) return
@@ -77,8 +78,19 @@ export function useAudioPlayer(
 
   function changeVolume(v: number) {
     audioRef.current.volume = v
+    if (v > 0) previousVolume.current = v
     setVolume(v)
   }
 
-  return { playing, duration, currentTime, toggle, seek, volume, changeVolume }
+  function toggleMute() {
+    if (volume === 0) {
+      changeVolume(previousVolume.current)
+    }
+    else {
+      previousVolume.current = volume
+      changeVolume(0)
+    }
+  }
+
+  return { playing, duration, currentTime, toggle, seek, volume, changeVolume, toggleMute }
 }
