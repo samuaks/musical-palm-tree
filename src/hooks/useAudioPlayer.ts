@@ -11,12 +11,10 @@ export function useAudioPlayer(
   const [duration, setDuration] = useState(0)
   const [currentTime, setCurrentTime] = useState(0)
   const [volume, setVolume] = useState(1)
-  const [convertedSrc, setConvertedSrc] = useState<string>('')
 
   useEffect(() => {
   if (!track) return
   const src = convertFileSrc(track.path)
-  setConvertedSrc(src)
   const audio = audioRef.current
   audio.pause()        
   audio.src = src
@@ -82,5 +80,5 @@ export function useAudioPlayer(
     setVolume(v)
   }
 
-  return { playing, duration, currentTime, toggle, seek, volume, changeVolume, convertedSrc }
+  return { playing, duration, currentTime, toggle, seek, volume, changeVolume }
 }

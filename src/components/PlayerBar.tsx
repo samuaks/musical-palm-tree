@@ -21,13 +21,15 @@ function formatTime(s: number) {
 
 
 export function PlayerBar({ track, onNext, onPrev }: PlayerBarProps) {
-  const { playing, duration, currentTime, toggle, seek, convertedSrc, changeVolume,volume } = useAudioPlayer(track, onNext)
+  const { playing, duration, currentTime, toggle, seek, changeVolume,volume } = useAudioPlayer(track, onNext)
   const { waveformData, generateWaveform, loading } = useWaveform()
   const displayName = track?.name.replace(/\.[^/.]+$/, '') ?? 'No track selected'
 
-  useEffect(() => {
-    if (convertedSrc) generateWaveform(convertedSrc)
-  }, [convertedSrc])
+
+useEffect(() => {
+  if (!track) return
+  generateWaveform(track.path)
+}, [track])
 
 
   const VolumeIcon = volume === 0 ? VolumeX : volume > 0.5 ? Volume2 : Volume1
