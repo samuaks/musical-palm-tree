@@ -15,19 +15,30 @@ pub fn generate_waveform(path: String) -> Result<WaveformData, String> {
     let file = std::fs::File::open(&path).map_err(|e| e.to_string())?;
     let mss = MediaSourceStream::new(Box::new(file), Default::default());
     let mut hint = Hint::new();
-    if let Some(ext) = std::path::Path::new(&path).extension().and_then(|e| e.to_str()) {
+    if let Some(ext) = std::path::Path::new(&path)
+        .extension()
+        .and_then(|e| e.to_str())
+    {
         hint.with_extension(ext);
     }
 
     let probed = symphonia::default::get_probe()
-        .format(&hint, mss, &FormatOptions::default(), &MetadataOptions::default())
+        .format(
+            &hint,
+            mss,
+            &FormatOptions::default(),
+            &MetadataOptions::default(),
+        )
         .map_err(|e| e.to_string())?;
 
     let mut format = probed.format;
     let track = format
         .tracks()
         .iter()
-        .find(|t| t.codec_params.codec != symphonia::core::codecs::CODEC_TYPE_NULL && t.codec_params.sample_rate.is_some())
+        .find(|t| {
+            t.codec_params.codec != symphonia::core::codecs::CODEC_TYPE_NULL
+                && t.codec_params.sample_rate.is_some()
+        })
         .ok_or("no audio track found")?;
     let mut decoder = symphonia::default::get_codecs()
         .make(&track.codec_params, &DecoderOptions::default())
@@ -41,14 +52,18 @@ pub fn generate_waveform(path: String) -> Result<WaveformData, String> {
     let max_samples = sample_rate * 60;
 
     loop {
-        if raw_samples.len() >= max_samples { break; }
+        if raw_samples.len() >= max_samples {
+            break;
+        }
 
         let packet = match format.next_packet() {
             Ok(p) => p,
             Err(_) => break,
         };
 
-        if packet.track_id() != track_id { continue; }
+        if packet.track_id() != track_id {
+            continue;
+        }
 
         let decoded = match decoder.decode(&packet) {
             Ok(d) => d,
@@ -78,5 +93,7 @@ pub fn generate_waveform(path: String) -> Result<WaveformData, String> {
         vec![0.5; samples]
     };
 
-    Ok(WaveformData { samples: normalized })
+    Ok(WaveformData {
+        samples: normalized,
+    })
 }
