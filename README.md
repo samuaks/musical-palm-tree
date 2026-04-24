@@ -89,6 +89,7 @@ Produces platform-native installers in `src-tauri/target/release/bundle/`.
 ## Requirements
 
 - Bun 1.1+
+- Node 20+ (uses node:fs)
 - Rust (stable, managed via `rustup`)
 - On Windows: Microsoft C++ Build Tools
 - On macOS: Xcode Command Line Tools
