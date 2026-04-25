@@ -7,9 +7,10 @@ interface TrackListProps {
     query: string
     onPlay: (file: MediaFile) => void
 
+    durations: Record<string, number>
 }
 
-export function TrackList({ files, currentTrack, query, onPlay }: TrackListProps) {
+export function TrackList({ files, currentTrack, query, onPlay, durations }: TrackListProps) {
     if (files.length === 0) return null
 
    return (
@@ -20,6 +21,7 @@ export function TrackList({ files, currentTrack, query, onPlay }: TrackListProps
           file={file}
           query={query}
           onPlay={onPlay}
+          durations={durations}
           isPlaying={currentTrack?.path === file.path}
         />
       ))}

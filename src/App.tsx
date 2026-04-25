@@ -6,6 +6,7 @@ import { PlayerBar } from "./components/PlayerBar";
 import { usePlayer } from "./hooks/usePlayer";
 import { filterDirs } from "./utils/filterDirs";
 import { useScan } from "./hooks/useScan";
+import { useDurations } from "./hooks/useDurations";
 
 function App() {
 
@@ -16,6 +17,7 @@ function App() {
     liveCount,
     scanState
   } = useScan();
+  const durations = useDurations(dirs);
 
   const filteredDirs = useMemo(() => filterDirs(dirs, query), [dirs, query])
 
@@ -37,7 +39,9 @@ function App() {
     liveCount={liveCount}
   />
   <Library
-  scanState={scanState}  currentTrack={currentTrack} dirs={filteredDirs} onPlay={play} query={query} />
+  scanState={scanState}
+  durations={durations}
+  currentTrack={currentTrack} dirs={filteredDirs} onPlay={play} query={query} />
   
   <PlayerBar 
     track={currentTrack}
