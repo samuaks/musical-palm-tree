@@ -6,6 +6,7 @@ interface TrackProps {
   onPlay: (file: MediaFile) => void
   isPlaying?: boolean
   query: string
+  durations: Record<string, number>
 }
 
 const videoExts = ['mp4', 'mkv', 'webm', 'avi', 'mov']
@@ -37,7 +38,9 @@ function formatSize(bytes: number) {
   return `${(bytes / (1024 * 1024)).toFixed(1)}MB`
 }
 
-export function Track({ file, onPlay, isPlaying = false, query   }: TrackProps) {
+export function Track({ file, onPlay, isPlaying = false, query, durations }: TrackProps) {
+  const duration = durations[file.path] ?? 0;
+
   const displayName = file.name.replace(/\.[^/.]+$/, '') 
   const isVideo = videoExts.includes(file.ext.toLowerCase())
 
@@ -57,7 +60,7 @@ return (
     </span>
 
    <span className="text-xs font-mono text-slate-600 shrink-0 w-10 text-right">
-      {formatDuration(file.duration_secs)}
+      {formatDuration(duration)}
   </span>
   <span className="text-xs font-mono text-slate-600 shrink-0 w-16 text-right">
      {formatSize(file.size_bytes)}

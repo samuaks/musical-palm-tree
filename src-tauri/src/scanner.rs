@@ -3,8 +3,7 @@ use walkdir::WalkDir;
 use std::io::{Read, Seek, SeekFrom};
 use std::collections::HashMap;
 use tauri::Emitter;
-use lofty::probe::Probe;
-use lofty::prelude::AudioFile;
+use rayon::prelude::*;
 
 
 
@@ -47,6 +46,16 @@ pub struct ScanResult {
     duplicates: Vec<Vec<String>>
 }
 
+struct Entry {
+    path: String,
+    name: String,
+    ext: String,
+    top: String,
+    album: Option<String>
+}
+
+
+
 fn partial_hash(path: &str) -> Option<String> {
     let mut file = std::fs::File::open(path).ok()?;
     let mut buf = vec![0u8; 4096];
@@ -60,14 +69,20 @@ fn partial_hash(path: &str) -> Option<String> {
     Some(format!("{:x}", md5::compute(&buf)))
 }
 
-fn read_duration(path: &str) -> f64 {
+/*fn read_duration(path: &str) -> f64 {
+    // purkka ratkaisu isoihin tiedostoihin: jos yli 500mb, ei laske kestoa
+    let size = std::fs::metadata(path).map(|m| m.len()).unwrap_or(0);
+    if size > 500 * 1024 * 1024 {
+        return 0.0;
+    }
+
     Probe::open(path)
         .ok()
         .and_then(|p| p.guess_file_type().ok())
         .and_then(|f| f.read().ok())
         .map(|t| t.properties().duration().as_secs_f64())
         .unwrap_or(0.0)
-}
+}*/
 
 fn read_size(path: &str) -> u64 {
     std::fs::metadata(path).map(|m| m.len()).unwrap_or(0)
@@ -78,123 +93,170 @@ pub async fn scan_media(app: tauri::AppHandle) -> ScanResult {
     let start = std::time::Instant::now();
     let audio_ext = ["mp3", "flac", "wav", "aac", "ogg"];
     let video_ext = ["mp4", "mkv", "webm", "avi", "mov"];
-
+    let allowed_dirs = ["Downloads", "Music", "Videos", "Desktop", "Documents"];
     let home = dirs::home_dir().unwrap_or(PathBuf::from("/"));
 
-    let mut groups: HashMap<String, Directory> = HashMap::new();
-    let mut seen: HashMap<String, Vec<String>> = HashMap::new();
-    let mut file_count = 0;
-
-    WalkDir::new(&home)
+    // phase 1 — single-threaded walk to collect entries
+    let entries: Vec<Entry> = WalkDir::new(&home)
         .min_depth(1)
         .max_depth(4)
         .into_iter()
         .filter_map(|e| e.ok())
         .filter(|e| e.file_type().is_file())
-       .for_each(|e| {
-            let ext = match e.path()
+        .filter_map(|e| {
+            let ext = e.path()
                 .extension()
                 .and_then(|x| x.to_str())
-                .map(|x| x.to_lowercase())
-            {
-                Some(x) if audio_ext.contains(&x.as_str()) || video_ext.contains(&x.as_str()) => x,
-                _ => return,
-            };
+                .map(|x| x.to_lowercase())?;
 
-            let rel = e.path().strip_prefix(&home).unwrap();
+            if !audio_ext.contains(&ext.as_str()) && !video_ext.contains(&ext.as_str()) {
+                return None;
+            }
+
+            let rel = e.path().strip_prefix(&home).ok()?;
             let parts: Vec<_> = rel.components().collect();
-            if parts.len() < 2 { return; }
+            if parts.len() < 2 { return None; }
 
             let top = parts[0].as_os_str().to_string_lossy().to_string();
+            if !allowed_dirs.contains(&top.as_str()) { return None; }
 
-            // skip dirs not in whitelist
-            let allowed_dirs = ["Downloads", "Music", "Videos", "Desktop", "Documents"];
-            if !allowed_dirs.contains(&top.as_str()) { return; }
+            let album = if parts.len() >= 3 {
+                Some(parts[1].as_os_str().to_string_lossy().to_string())
+            } else {
+                None
+            };
 
-            let file = MediaFile {
+            Some(Entry {
                 path: e.path().to_string_lossy().to_string(),
                 name: e.file_name().to_string_lossy().to_string(),
                 ext,
-                duration_secs: read_duration(e.path().to_str().unwrap_or("")),
-                size_bytes: read_size(e.path().to_str().unwrap_or(""))
-            };
+                top,
+                album,
+            })
+        })
+        .collect();
 
-            if let Some(hash) = partial_hash(e.path().to_str().unwrap_or("")) {
-                let paths = seen.entry(hash).or_insert_with(Vec::new);
-                // if we've already seen this hash, skip adding to groups entirely
-                if !paths.is_empty() {
-                    paths.push(e.path().to_string_lossy().to_string());
-                    return;
-                }
-                paths.push(e.path().to_string_lossy().to_string());
-            }
-            if parts.len() >= 3 {
-                let album = parts[1].as_os_str().to_string_lossy().to_string();
-                let group = groups.entry(top.clone()).or_insert(Directory {
-                    name: top.clone(),
-                    path: home.join(&top).to_string_lossy().to_string(),
-                    albums: Vec::new(),
-                    files: Vec::new(),
-                });
-                if let Some(alb) = group.albums.iter_mut().find(|a| a.name == album) {
-                    alb.files.push(file);
-                } else {
-                    group.albums.push(Album { name: album, files: vec![file] });
-                }
-            } else {
-                let group = groups.entry(top.clone()).or_insert(Directory {
-                    name: top.clone(),
-                    path: home.join(&top).to_string_lossy().to_string(),
-                    albums: Vec::new(),
-                    files: Vec::new(),
-                });
-                group.files.push(file);
-            }
-            file_count += 1;
+    // phase 2 — process in parallel chunks, emit progress between chunks
+    let chunk_size = 50;
+    let mut groups: HashMap<String, Directory> = HashMap::new();
+    let mut seen: HashMap<String, Vec<String>> = HashMap::new();
 
-            if file_count % 10 == 0 {
-                let mut current: Vec<&Directory> = groups.values().collect();
-                current.sort_by(|a, b| a.name.cmp(&b.name));
-                app.emit("scan_progress", &current).ok();
-            }
-        });
 
-        let mut directories: Vec<Directory> = groups.into_values().collect();
-        directories.sort_by(|a, b| a.name.cmp(&b.name));
+    println!("total entries collected: {}", entries.len());
+    for chunk in entries.chunks(chunk_size) {
+        let processed_chunk: Vec<(Entry, MediaFile, Option<String>)> = chunk
+            .par_iter()
+            .map(|entry| {
+                let duration_secs = 0.0;
+                let size_bytes = read_size(&entry.path);
+                let hash = partial_hash(&entry.path);
 
-        let mut paths_to_remove: std::collections::HashSet<String> = std::collections::HashSet::new();
-        let duplicates: Vec<Vec<String>> = seen.into_values()
-            .filter(|paths| paths.len() > 1)
-            .map(|paths| {
-                for path in paths.iter().skip(1) {
-                    paths_to_remove.insert(path.clone());
-                }
-                paths
+                let file = MediaFile {
+                    path: entry.path.clone(),
+                    name: entry.name.clone(),
+                    ext: entry.ext.clone(),
+                    duration_secs,
+                    size_bytes,
+                };
+
+                // clone entry since we only have a borrowed reference
+                let entry_clone = Entry {
+                    path: entry.path.clone(),
+                    name: entry.name.clone(),
+                    ext: entry.ext.clone(),
+                    top: entry.top.clone(),
+                    album: entry.album.clone(),
+                };
+
+                (entry_clone, file, hash)
             })
             .collect();
 
-        println!("paths_to_remove: {:?}", paths_to_remove);
-        println!("sample file path: {}", directories[0].files.first().map(|f| f.path.as_str()).unwrap_or("none"));
+        // single-threaded merge into groups + dedup tracking
+        for (entry, file, hash) in processed_chunk {
+            if let Some(hash) = hash {
+                let paths = seen.entry(hash).or_insert_with(Vec::new);
+                if !paths.is_empty() {
+                    paths.push(file.path.clone());
+                    continue;
+                }
+                paths.push(file.path.clone());
+            }
 
-        // remove duplicates first
-        for dir in directories.iter_mut() {
-            dir.files.retain(|f| !paths_to_remove.contains(&f.path));
-            for album in dir.albums.iter_mut() {
-                album.files.retain(|f| !paths_to_remove.contains(&f.path));
+            let group = groups.entry(entry.top.clone()).or_insert(Directory {
+                name: entry.top.clone(),
+                path: home.join(&entry.top).to_string_lossy().to_string(),
+                albums: Vec::new(),
+                files: Vec::new(),
+            });
+
+            if let Some(album_name) = entry.album {
+                if let Some(alb) = group.albums.iter_mut().find(|a| a.name == album_name) {
+                    alb.files.push(file);
+                } else {
+                    group.albums.push(Album { name: album_name, files: vec![file] });
+                }
+            } else {
+                group.files.push(file);
             }
         }
 
-        // then count after dedup
-        let total_files = directories.iter()
+        // emit after each chunk
+        let mut current: Vec<&Directory> = groups.values().collect();
+        current.sort_by(|a, b| a.name.cmp(&b.name));
+        app.emit("scan_progress", &current).ok();
+
+        let count: usize = groups.values()
             .map(|d| d.files.len() + d.albums.iter().map(|a| a.files.len()).sum::<usize>())
             .sum();
-        let total_albums = directories.iter().map(|d| d.albums.len()).sum();
-        let total_directories = directories.len();
-        ScanResult {
-            metadata: ScanMetaData { duration_ms: start.elapsed().as_millis(), total_files, total_albums, total_directories, total_duplicates: duplicates.len() },
-            directories,
-            duplicates
+        println!("after chunk: count = {}", count);
+        app.emit("scan_count", count).ok();
+
+    }
+
+   let final_count: usize = groups.values()
+    .map(|d| d.files.len() + d.albums.iter().map(|a| a.files.len()).sum::<usize>())
+    .sum();
+println!("after all chunks, before retain: {}", final_count);
+
+    // post-processing — sort, dedup retain, build metadata
+    let mut directories: Vec<Directory> = groups.into_values().collect();
+    directories.sort_by(|a, b| a.name.cmp(&b.name));
+
+    let mut paths_to_remove: std::collections::HashSet<String> = std::collections::HashSet::new();
+    let duplicates: Vec<Vec<String>> = seen.into_values()
+        .filter(|paths| paths.len() > 1)
+        .map(|paths| {
+            for path in paths.iter().skip(1) {
+                paths_to_remove.insert(path.clone());
+            }
+            paths
+        })
+        .collect();
+
+    for dir in directories.iter_mut() {
+        dir.files.retain(|f| !paths_to_remove.contains(&f.path));
+        for album in dir.albums.iter_mut() {
+            album.files.retain(|f| !paths_to_remove.contains(&f.path));
         }
+    }
 
+    let total_files = directories.iter()
+        .map(|d| d.files.len() + d.albums.iter().map(|a| a.files.len()).sum::<usize>())
+        .sum();
+    let total_albums = directories.iter().map(|d| d.albums.len()).sum();
+    let total_directories = directories.len();
 
+    ScanResult {
+        metadata: ScanMetaData {
+            duration_ms: start.elapsed().as_millis(),
+            total_files,
+            total_albums,
+            total_directories,
+            total_duplicates: duplicates.len(),
+        },
+        directories,
+        duplicates,
+    }
 }
+      

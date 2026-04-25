@@ -10,11 +10,12 @@ interface LibraryProps {
   currentTrack: MediaFile | null
   onPlay: (file: MediaFile) => void
   scanState: ScanState
+  durations: Record<string, number>
 }
 
 
 
-export function Library({ dirs, query, currentTrack, onPlay, scanState }: LibraryProps) {
+export function Library({ dirs, query, currentTrack, onPlay, scanState, durations }: LibraryProps) {
   const filtered = dirs
 
   const {isCollapsed, toggle} = useCollapsed()
@@ -55,6 +56,7 @@ export function Library({ dirs, query, currentTrack, onPlay, scanState }: Librar
             currentTrack={currentTrack}
             onPlay={onPlay}
             query={query}
+            durations={durations}
           />
 
           {dir.albums.map(album => {
@@ -85,6 +87,7 @@ export function Library({ dirs, query, currentTrack, onPlay, scanState }: Librar
                     currentTrack={currentTrack}
                     onPlay={onPlay}
                     query={query}
+                    durations={durations}
                   />
                 </div>
               </div>

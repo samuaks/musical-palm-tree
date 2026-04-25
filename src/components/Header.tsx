@@ -5,9 +5,10 @@ interface HeaderProps {
   onSearch: (q: string) => void
   scanMeta: ScanMetaData | null
   scanState: ScanState
+  liveCount?: number
 }
 
-export function Header({ query, onSearch, scanMeta, scanState }: HeaderProps) {
+export function Header({ query, onSearch, scanMeta, scanState, liveCount }: HeaderProps) {
   return (
     <div className="shrink-0 px-4 pt-4 pb-3 border-b border-slate-700">
       <span className="text-teal-400 font-bold tracking-wide text-sm">
@@ -18,7 +19,7 @@ export function Header({ query, onSearch, scanMeta, scanState }: HeaderProps) {
             <div className="flex items-center gap-2 mt-1">
               <div className="w-1.5 h-1.5 rounded-full bg-teal-400 animate-pulse" />
               <span className="text-xs text-slate-500 font-mono animate-pulse">
-                scanning library...
+                scanning library... {liveCount && <span className="text-app-text">{liveCount} files</span>}
               </span>
             </div>
         )}

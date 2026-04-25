@@ -1,42 +1,27 @@
-import { useEffect, useMemo, useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
-import {listen} from "@tauri-apps/api/event";
+import { useMemo, useState } from "react";
 import "./App.css";
-import { Directory, ScanMetaData, ScanResult, ScanState } from "./types";
 import { Header } from "./components/Header";
 import { Library } from "./components/Library";
 import { PlayerBar } from "./components/PlayerBar";
 import { usePlayer } from "./hooks/usePlayer";
 import { filterDirs } from "./utils/filterDirs";
+import { useScan } from "./hooks/useScan";
+import { useDurations } from "./hooks/useDurations";
 
 function App() {
-  const [scanMeta, setScanMeta] = useState<ScanMetaData | null>(null);
-  const [dirs, setDirs] = useState<Directory[]>([]);
+
   const [query, setQuery] = useState('');
-  const [scanState, setScanState] = useState<ScanState>('idle');
+  const {
+    scanMeta,
+    dirs,
+    liveCount,
+    scanState
+  } = useScan();
+  const durations = useDurations(dirs);
 
   const filteredDirs = useMemo(() => filterDirs(dirs, query), [dirs, query])
 
-  useEffect(() => {
-    setScanState('scanning')
 
-    // mount listener
-    const unlisten = listen<Directory[]>('scan_progress', event => {
-      setDirs(event.payload)
-    })
-
-
-    invoke<ScanResult>("scan_media").then(r => {
-      setDirs(r.directories)
-      setScanMeta(r.metadata)
-      setScanState('done')
-    })  
-
-    // unmount listener on cleanup
-    return () => {
-      unlisten.then(f => f())
-    }
-  }, []);
 
   const {
     currentTrack,
@@ -51,9 +36,12 @@ function App() {
   scanState={scanState}
   onSearch={setQuery} 
     scanMeta={scanMeta}
+    liveCount={liveCount}
   />
   <Library
-  scanState={scanState}  currentTrack={currentTrack} dirs={filteredDirs} onPlay={play} query={query} />
+  scanState={scanState}
+  durations={durations}
+  currentTrack={currentTrack} dirs={filteredDirs} onPlay={play} query={query} />
   
   <PlayerBar 
     track={currentTrack}
