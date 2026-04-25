@@ -3,8 +3,6 @@ use walkdir::WalkDir;
 use std::io::{Read, Seek, SeekFrom};
 use std::collections::HashMap;
 use tauri::Emitter;
-use lofty::probe::Probe;
-use lofty::prelude::AudioFile;
 use rayon::prelude::*;
 
 
@@ -71,7 +69,7 @@ fn partial_hash(path: &str) -> Option<String> {
     Some(format!("{:x}", md5::compute(&buf)))
 }
 
-fn read_duration(path: &str) -> f64 {
+/*fn read_duration(path: &str) -> f64 {
     // purkka ratkaisu isoihin tiedostoihin: jos yli 500mb, ei laske kestoa
     let size = std::fs::metadata(path).map(|m| m.len()).unwrap_or(0);
     if size > 500 * 1024 * 1024 {
@@ -84,7 +82,7 @@ fn read_duration(path: &str) -> f64 {
         .and_then(|f| f.read().ok())
         .map(|t| t.properties().duration().as_secs_f64())
         .unwrap_or(0.0)
-}
+}*/
 
 fn read_size(path: &str) -> u64 {
     std::fs::metadata(path).map(|m| m.len()).unwrap_or(0)
@@ -149,7 +147,7 @@ pub async fn scan_media(app: tauri::AppHandle) -> ScanResult {
         let processed_chunk: Vec<(Entry, MediaFile, Option<String>)> = chunk
             .par_iter()
             .map(|entry| {
-                let duration_secs = read_duration(&entry.path);
+                let duration_secs = 0.0;
                 let size_bytes = read_size(&entry.path);
                 let hash = partial_hash(&entry.path);
 
