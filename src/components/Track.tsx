@@ -1,5 +1,7 @@
 import { Music, Video } from 'lucide-react'
 import { MediaFile } from '../types'
+import { useEffect, useRef, useState } from 'react'
+import { useAlbumArt } from '../hooks/useAlbumArt'
 
 interface TrackProps {
   file: MediaFile
@@ -39,32 +41,62 @@ function formatSize(bytes: number) {
 }
 
 export function Track({ file, onPlay, isPlaying = false, query, durations }: TrackProps) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [visible, setVisible] = useState(false)
+  //const art = useAlbumArt(file.path, false)
+
   const duration = durations[file.path] ?? 0;
 
   const displayName = file.name.replace(/\.[^/.]+$/, '') 
   const isVideo = videoExts.includes(file.ext.toLowerCase())
 
+  useEffect(() => {
+    if (!ref.current || visible) return
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setVisible(true)
+          observer.disconnect()
+        }
+      },
+      {rootMargin: '200px'}
+    )
+    observer.observe(ref.current)
+    return () => observer.disconnect()
+  }, [visible])
+
 return (
-  <div
-    onClick={() => onPlay(file)}
-    className={`flex items-center gap-3 px-6 py-1.5 cursor-pointer hover:bg-white/5 transition-colors ${
-      isPlaying ? 'border-l-2 border-teal-400' : 'border-l-2 border-transparent'
-    }`}
-  >
-    <div className="text-slate-600 shrink-0">
-      {isVideo ? <Video size={12} /> : <Music size={12} />}
+    <div
+      ref={ref}
+      onClick={() => onPlay(file)}
+      className={`flex items-center gap-3 px-6 py-1.5 cursor-pointer transition-colors ${
+        isPlaying
+          ? 'border-l-2 border-app-accent bg-app-selected'
+          : 'border-l-2 border-transparent hover:bg-app-hover'
+      }`}
+    >
+      <div className="shrink-0 w-6 h-6 flex items-center justify-center rounded overflow-hidden bg-app-border">
+        {true ? (
+          <img src={undefined} alt="" className="w-full h-full object-cover" />
+        ) : (
+          <div className="text-app-muted">
+            {isVideo ? <Video size={12} /> : <Music size={12} />}
+          </div>
+        )}
+      </div>
+
+      <span className={`text-sm font-mono flex-1 truncate min-w-0 ${
+        isPlaying ? 'text-app-accent' : 'text-app-text'
+      }`}>
+        {highlight(displayName, query)}
+      </span>
+
+      <span className="text-xs font-mono text-app-muted shrink-0 w-10 text-right">
+        {formatDuration(duration)}
+      </span>
+      <span className="text-xs font-mono text-app-muted shrink-0 w-16 text-right">
+        {formatSize(file.size_bytes)}
+      </span>
     </div>
-
-    <span className={`text-sm font-mono flex-1 truncate min-w-0 ${isPlaying ? 'text-teal-400' : 'text-slate-300'}`}>
-      {highlight(displayName, query)}
-    </span>
-
-   <span className="text-xs font-mono text-slate-600 shrink-0 w-10 text-right">
-      {formatDuration(duration)}
-  </span>
-  <span className="text-xs font-mono text-slate-600 shrink-0 w-16 text-right">
-     {formatSize(file.size_bytes)}
-  </span>
-  </div>
-)
+  )
 }
