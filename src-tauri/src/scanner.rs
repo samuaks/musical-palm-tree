@@ -1,11 +1,9 @@
-use std::path::PathBuf;
-use walkdir::WalkDir;
-use std::io::{Read, Seek, SeekFrom};
-use std::collections::HashMap;
-use tauri::Emitter;
 use rayon::prelude::*;
-
-
+use std::collections::HashMap;
+use std::io::{Read, Seek, SeekFrom};
+use std::path::PathBuf;
+use tauri::Emitter;
+use walkdir::WalkDir;
 
 #[derive(serde::Serialize)]
 pub struct MediaFile {
@@ -13,13 +11,13 @@ pub struct MediaFile {
     name: String,
     ext: String,
     duration_secs: f64,
-    size_bytes: u64
+    size_bytes: u64,
 }
 
 #[derive(serde::Serialize)]
 pub struct Album {
     name: String,
-    files: Vec<MediaFile>
+    files: Vec<MediaFile>,
 }
 
 #[derive(serde::Serialize)]
@@ -27,7 +25,7 @@ pub struct Directory {
     name: String,
     path: String,
     albums: Vec<Album>,
-    files: Vec<MediaFile>
+    files: Vec<MediaFile>,
 }
 
 #[derive(serde::Serialize)]
@@ -36,14 +34,14 @@ pub struct ScanMetaData {
     total_files: usize,
     total_albums: usize,
     total_directories: usize,
-    total_duplicates: usize
+    total_duplicates: usize,
 }
 
 #[derive(serde::Serialize)]
 pub struct ScanResult {
     metadata: ScanMetaData,
     directories: Vec<Directory>,
-    duplicates: Vec<Vec<String>>
+    duplicates: Vec<Vec<String>>,
 }
 
 struct Entry {
@@ -51,10 +49,8 @@ struct Entry {
     name: String,
     ext: String,
     top: String,
-    album: Option<String>
+    album: Option<String>,
 }
-
-
 
 fn partial_hash(path: &str) -> Option<String> {
     let mut file = std::fs::File::open(path).ok()?;
@@ -104,7 +100,8 @@ pub async fn scan_media(app: tauri::AppHandle) -> ScanResult {
         .filter_map(|e| e.ok())
         .filter(|e| e.file_type().is_file())
         .filter_map(|e| {
-            let ext = e.path()
+            let ext = e
+                .path()
                 .extension()
                 .and_then(|x| x.to_str())
                 .map(|x| x.to_lowercase())?;
@@ -115,10 +112,14 @@ pub async fn scan_media(app: tauri::AppHandle) -> ScanResult {
 
             let rel = e.path().strip_prefix(&home).ok()?;
             let parts: Vec<_> = rel.components().collect();
-            if parts.len() < 2 { return None; }
+            if parts.len() < 2 {
+                return None;
+            }
 
             let top = parts[0].as_os_str().to_string_lossy().to_string();
-            if !allowed_dirs.contains(&top.as_str()) { return None; }
+            if !allowed_dirs.contains(&top.as_str()) {
+                return None;
+            }
 
             let album = if parts.len() >= 3 {
                 Some(parts[1].as_os_str().to_string_lossy().to_string())
@@ -140,7 +141,6 @@ pub async fn scan_media(app: tauri::AppHandle) -> ScanResult {
     let chunk_size = 50;
     let mut groups: HashMap<String, Directory> = HashMap::new();
     let mut seen: HashMap<String, Vec<String>> = HashMap::new();
-
 
     println!("total entries collected: {}", entries.len());
     for chunk in entries.chunks(chunk_size) {
@@ -194,7 +194,10 @@ pub async fn scan_media(app: tauri::AppHandle) -> ScanResult {
                 if let Some(alb) = group.albums.iter_mut().find(|a| a.name == album_name) {
                     alb.files.push(file);
                 } else {
-                    group.albums.push(Album { name: album_name, files: vec![file] });
+                    group.albums.push(Album {
+                        name: album_name,
+                        files: vec![file],
+                    });
                 }
             } else {
                 group.files.push(file);
@@ -206,25 +209,27 @@ pub async fn scan_media(app: tauri::AppHandle) -> ScanResult {
         current.sort_by(|a, b| a.name.cmp(&b.name));
         app.emit("scan_progress", &current).ok();
 
-        let count: usize = groups.values()
+        let count: usize = groups
+            .values()
             .map(|d| d.files.len() + d.albums.iter().map(|a| a.files.len()).sum::<usize>())
             .sum();
         println!("after chunk: count = {}", count);
         app.emit("scan_count", count).ok();
-
     }
 
-   let final_count: usize = groups.values()
-    .map(|d| d.files.len() + d.albums.iter().map(|a| a.files.len()).sum::<usize>())
-    .sum();
-println!("after all chunks, before retain: {}", final_count);
+    let final_count: usize = groups
+        .values()
+        .map(|d| d.files.len() + d.albums.iter().map(|a| a.files.len()).sum::<usize>())
+        .sum();
+    println!("after all chunks, before retain: {}", final_count);
 
     // post-processing — sort, dedup retain, build metadata
     let mut directories: Vec<Directory> = groups.into_values().collect();
     directories.sort_by(|a, b| a.name.cmp(&b.name));
 
     let mut paths_to_remove: std::collections::HashSet<String> = std::collections::HashSet::new();
-    let duplicates: Vec<Vec<String>> = seen.into_values()
+    let duplicates: Vec<Vec<String>> = seen
+        .into_values()
         .filter(|paths| paths.len() > 1)
         .map(|paths| {
             for path in paths.iter().skip(1) {
@@ -241,7 +246,8 @@ println!("after all chunks, before retain: {}", final_count);
         }
     }
 
-    let total_files = directories.iter()
+    let total_files = directories
+        .iter()
         .map(|d| d.files.len() + d.albums.iter().map(|a| a.files.len()).sum::<usize>())
         .sum();
     let total_albums = directories.iter().map(|d| d.albums.len()).sum();
@@ -259,4 +265,3 @@ println!("after all chunks, before retain: {}", final_count);
         duplicates,
     }
 }
-      
