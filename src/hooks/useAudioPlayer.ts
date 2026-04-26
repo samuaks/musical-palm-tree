@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { convertFileSrc } from '@tauri-apps/api/core'
 import { MediaFile } from '../types'
+import { useVolume } from './useVolume'
 
 const videoExts = ['mp4', 'mkv', 'webm', 'avi', 'mov']
 
@@ -13,9 +14,11 @@ export function useAudioPlayer(
   const [playing, setPlaying] = useState(false)
   const [duration, setDuration] = useState(0)
   const [currentTime, setCurrentTime] = useState(0)
-  const [volume, setVolume] = useState(1)
-  const prevVolume = useRef(1)
   const [convertedSrc, setConvertedSrc] = useState<string>('')
+
+  const {volume, changeVolume, toggleMute} = useVolume()
+
+  //useAudioNormalization(audioRef)
 
   const isVideo = track ? videoExts.includes(track.ext.toLowerCase()) : false
 
@@ -48,6 +51,11 @@ useEffect(() => {
       .catch(e => { if (e.name !== 'AbortError') console.error(e) })
   }
 }, [track])
+
+useEffect(() => {
+  const media = getMedia()
+  media.volume = volume
+}, [volume, track])
 
   useEffect(() => {
     const media = getMedia()
@@ -96,22 +104,6 @@ useEffect(() => {
     const media = getMedia()
     media.currentTime = time
     setCurrentTime(time)
-  }
-
-  function changeVolume(v: number) {
-    const media = getMedia()
-    media.volume = v
-    if (v > 0) prevVolume.current = v
-    setVolume(v)
-  }
-
-  function toggleMute() {
-    if (volume === 0) {
-      changeVolume(prevVolume.current)
-    } else {
-      prevVolume.current = volume
-      changeVolume(0)
-    }
   }
 
   return { playing, duration, currentTime, toggle, seek, volume, changeVolume, toggleMute, convertedSrc, isVideo }
