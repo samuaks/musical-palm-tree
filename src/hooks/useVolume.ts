@@ -5,17 +5,17 @@ const STORAGE_KEY = 'playmusic-volume'
 export function useVolume() {
   const [volume, setVolume] = useState(() => {
     try {
-        const saved = localStorage.getItem(STORAGE_KEY)
-        return saved ? Number(saved) : 1
+      const saved = localStorage.getItem(STORAGE_KEY)
+      return saved ? Number(saved) : 1
     } catch {
-        return 1
+      return 1
     }
   })
 
   const prevVolume = useRef(volume)
 
   useEffect(() => {
-        localStorage.setItem(STORAGE_KEY, String(volume))
+    localStorage.setItem(STORAGE_KEY, String(volume))
   }, [volume])
 
   function changeVolume(v: number) {
@@ -25,10 +25,10 @@ export function useVolume() {
 
   function toggleMute() {
     if (volume === 0) {
-        changeVolume(prevVolume.current)
+      changeVolume(prevVolume.current)
     } else {
-        prevVolume.current = volume
-        changeVolume(0)
+      prevVolume.current = volume
+      changeVolume(0)
     }
   }
 

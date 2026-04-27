@@ -2,8 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { convertFileSrc } from '@tauri-apps/api/core'
 import { MediaFile } from '../types'
 import { useVolume } from './useVolume'
-
-const videoExts = ['mp4', 'mkv', 'webm', 'avi', 'mov']
+import { isVideo } from '../constants'
 
 export function useAudioPlayer(
   track: MediaFile | null,
@@ -16,53 +15,61 @@ export function useAudioPlayer(
   const [currentTime, setCurrentTime] = useState(0)
   const [convertedSrc, setConvertedSrc] = useState<string>('')
 
-  const {volume, changeVolume, toggleMute} = useVolume()
+  const { volume, changeVolume, toggleMute } = useVolume()
 
   //useAudioNormalization(audioRef)
 
-  const isVideo = track ? videoExts.includes(track.ext.toLowerCase()) : false
+  const trackIsVideo = track ? isVideo(track.ext) : false
 
-  // pick the right element based on track type
   function getMedia(): HTMLAudioElement | HTMLVideoElement {
-    if (isVideo && videoRef.current) return videoRef.current
+    if (trackIsVideo && videoRef.current) return videoRef.current
     return audioRef.current
   }
 
-useEffect(() => {
-  if (!track) return
+  useEffect(() => {
+    if (!track) return
 
-  // pause both elements before switching
-  audioRef.current.pause()
-  if (videoRef.current) videoRef.current.pause()
+    // pause both elements before switching
+    audioRef.current.pause()
+    if (videoRef.current) videoRef.current.pause()
 
-  const src = convertFileSrc(track.path)
-  setConvertedSrc(src)
-  const media = getMedia()
-  media.src = src
-  media.load()
-  setCurrentTime(0)
-  setDuration(0)
-  setPlaying(false)
+    const src = convertFileSrc(track.path)
+    setConvertedSrc(src)
+    const media = getMedia()
+    media.src = src
+    media.load()
+    setCurrentTime(0)
+    setDuration(0)
+    setPlaying(false)
 
-  const playPromise = media.play()
-  if (playPromise) {
-    playPromise
-      .then(() => setPlaying(true))
-      .catch(e => { if (e.name !== 'AbortError') console.error(e) })
-  }
-}, [track])
+    const playPromise = media.play()
+    if (playPromise) {
+      playPromise
+        .then(() => setPlaying(true))
+        .catch((e) => {
+          if (e.name !== 'AbortError') console.error(e)
+        })
+    }
+  }, [track])
 
-useEffect(() => {
-  const media = getMedia()
-  media.volume = volume
-}, [volume, track])
+  useEffect(() => {
+    const media = getMedia()
+    media.volume = volume
+  }, [volume, track])
 
   useEffect(() => {
     const media = getMedia()
 
-    function handleMetadata() { setDuration(media.duration) }
-    function handleTimeUpdate() { setCurrentTime(media.currentTime) }
-    function handleEnded() { setPlaying(false); onEnded?.() }
+    function handleMetadata() {
+      setDuration(media.duration)
+    }
+    function handleTimeUpdate() {
+      setCurrentTime(media.currentTime)
+    }
+    function handleEnded() {
+      setPlaying(false)
+      onEnded?.()
+    }
 
     media.addEventListener('loadedmetadata', handleMetadata)
     media.addEventListener('timeupdate', handleTimeUpdate)
@@ -91,10 +98,15 @@ useEffect(() => {
 
   function toggle() {
     const media = getMedia()
-    if (playing) { media.pause() } else {
-      media.play()
+    if (playing) {
+      media.pause()
+    } else {
+      media
+        .play()
         .then(() => setPlaying(true))
-        .catch(e => { if (e.name !== 'AbortError') console.error(e) })
+        .catch((e) => {
+          if (e.name !== 'AbortError') console.error(e)
+        })
       return
     }
     setPlaying(!playing)
@@ -106,5 +118,15 @@ useEffect(() => {
     setCurrentTime(time)
   }
 
-  return { playing, duration, currentTime, toggle, seek, volume, changeVolume, toggleMute, convertedSrc, isVideo }
+  return {
+    playing,
+    duration,
+    currentTime,
+    toggle,
+    seek,
+    volume,
+    changeVolume,
+    toggleMute,
+    convertedSrc,
+  }
 }

@@ -1,21 +1,43 @@
 import { useState, useRef, useEffect } from 'react'
 
 interface UseResizableOptions {
-  defaultHeight: number
+  defaultSize: number
   min?: number
-  maxFromViewport?: number // subtract from window.innerHeight for max
+  maxFromViewport?: number
+  axis?: 'vertical' | 'horizontal'
+  storageKey?: string
 }
 
-export function useResizable({ defaultHeight, min = 128, maxFromViewport = 100 }: UseResizableOptions) {
-  const [height, setHeight] = useState(defaultHeight)
+export function useResizable({
+  defaultSize,
+  min = 128,
+  maxFromViewport = 100,
+  axis = 'vertical',
+  storageKey,
+}: UseResizableOptions) {
+  const [size, setSize] = useState<number>(() => {
+    if (!storageKey) return defaultSize
+    try {
+      const saved = localStorage.getItem(storageKey)
+      return saved ? Number(saved) : defaultSize
+    } catch {
+      return defaultSize
+    }
+  })
   const dragging = useRef(false)
+
+  useEffect(() => {
+    if (!storageKey) return
+    localStorage.setItem(storageKey, String(size))
+  }, [size, storageKey])
 
   useEffect(() => {
     function handleMouseMove(e: MouseEvent) {
       if (!dragging.current) return
-      const newHeight = window.innerHeight - e.clientY
-      const max = window.innerHeight - maxFromViewport
-      setHeight(Math.max(min, Math.min(max, newHeight)))
+      const newSize =
+        axis === 'vertical' ? window.innerHeight - e.clientY : window.innerWidth - e.clientX
+      const max = (axis === 'vertical' ? window.innerHeight : window.innerWidth) - maxFromViewport
+      setSize(Math.max(min, Math.min(max, newSize)))
     }
     function handleMouseUp() {
       dragging.current = false
@@ -32,9 +54,9 @@ export function useResizable({ defaultHeight, min = 128, maxFromViewport = 100 }
 
   function startDrag() {
     dragging.current = true
-    document.body.style.cursor = 'ns-resize'
+    document.body.style.cursor = axis === 'vertical' ? 'ns-resize' : 'ew-resize'
     document.body.style.userSelect = 'none'
   }
 
-  return { height, setHeight, startDrag }
+  return { size, setSize, startDrag }
 }
