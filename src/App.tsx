@@ -22,7 +22,6 @@ function App() {
   const filteredDirs = useMemo(() => filterDirs(dirs, query), [dirs, query])
 
 
-
   const {
     currentTrack,
     next,

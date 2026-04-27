@@ -7,13 +7,13 @@
   --color-app-selected: rgba(45,212,191,0.05);
   --color-app-text: #cbd5e1;
   --color-app-secondary: #94a3b8;
-  --color-app-muted: #475569;
+  --color-app-muted: #64748b;           
   --color-app-accent: #2dd4bf;
   --color-app-accent-played: #0d9488;
   --color-app-accent-dim: rgba(45,212,191,0.3);
   --color-app-border: #334155;
   --color-app-skeleton: #334155;
-  --color-app-waveform: #475569;
+  --color-app-waveform: #64748b;         
 }
 
 ::-webkit-scrollbar {
