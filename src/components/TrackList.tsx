@@ -1,22 +1,23 @@
-import { MediaFile } from "../types";
-import { Track } from "./Track";
+import { MediaFile } from '../types'
+import { Track } from './Track'
 
 interface TrackListProps {
-    files: MediaFile[]
-    currentTrack: MediaFile | null
-    query: string
-    onPlay: (file: MediaFile) => void
+  files: MediaFile[]
+  currentTrack: MediaFile | null
+  query: string
+  onPlay: (file: MediaFile) => void
 
-    durations: Record<string, number>
+  durations: Record<string, number>
 }
 
 export function TrackList({ files, currentTrack, query, onPlay, durations }: TrackListProps) {
-    if (files.length === 0) return null
+  if (files.length === 0) return null
 
-   return (
+  return (
     <div className="flex flex-col overflow-y-auto">
-      {files.map(file => (
+      {files.map((file, i) => (
         <Track
+          index={i}
           key={file.path}
           file={file}
           query={query}

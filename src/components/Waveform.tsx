@@ -1,85 +1,61 @@
-import { useMemo } from "react";
+import { useMemo, useState } from 'react'
 
 interface WaveformProps {
-  data: number[];
-  currentTime: number;
-  duration: number;
-  seek: (time: number) => void;
-  loading?: boolean;
+  data: number[]
+  currentTime: number
+  duration: number
+  onSeek: (time: number) => void
+  loading?: boolean
 }
+const MAX_BAR_HEIGHT = 70
+const MIN_BAR_HEIGHT = 8
 
-export function Waveform({
-  data,
-  currentTime,
-  duration,
-  seek,
-  loading,
-}: WaveformProps) {
-  const progress = duration > 0 ? currentTime / duration : 0;
+export function Waveform({ data, currentTime, duration, onSeek, loading = false }: WaveformProps) {
+  const [hoverPct, setHoverPct] = useState<number | null>(null)
+  const progress = duration > 0 ? currentTime / duration : 0
+
+  function handleMouseMove(e: React.MouseEvent<HTMLDivElement>) {
+    const rect = e.currentTarget.getBoundingClientRect()
+    const pct = (e.clientX - rect.left) / rect.width
+    setHoverPct(pct)
+  }
+
+  function handleMouseLeave() {
+    setHoverPct(null)
+  }
 
   const skeletonHeights = useMemo(
-    () =>
-      Array.from({ length: 100 }).map(() => Math.max(8, Math.random() * 100)),
-    [],
-  );
+    () => Array.from({ length: 100 }, () => Math.max(20, Math.random() * 100)),
+    []
+  )
 
   function handleClick(e: React.MouseEvent<HTMLDivElement>) {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = (e.clientX - rect.left) / rect.width;
-    seek(x * duration);
+    const rect = e.currentTarget.getBoundingClientRect()
+    const pct = (e.clientX - rect.left) / rect.width
+    onSeek(pct * duration)
   }
 
-  function handleKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
-    if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
-      e.preventDefault();
-      const delta = e.key === "ArrowLeft" ? -5 : 5;
-      seek(Math.max(0, Math.min(duration, currentTime + delta)));
-    }
-  }
-
-  if (!loading && data.length === 0) {
-    return <div className="w-full h-16 flex items-center justify-center" />;
+  function handleKeyDown(e: React.KeyboardEvent) {
+    if (e.key === 'ArrowRight') onSeek(Math.min(currentTime + 5, duration))
+    if (e.key === 'ArrowLeft') onSeek(Math.max(currentTime - 5, 0))
   }
 
   if (loading && data.length === 0) {
     return (
-      <div className="w-full flex items-end gap-px" style={{ height: "64px" }}>
+      <div className="w-full h-full flex items-end gap-0.5">
         {skeletonHeights.map((h, i) => (
           <div
             key={i}
-            style={{
-              flex: 1,
-              height: "100%",
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: "1px",
-            }}
-          >
-            <div
-              style={{
-                width: "100%",
-                height: `${h * 0.4}%`,
-                background: "var(--color-app-skeleton)",
-                opacity: 0.9,
-                borderRadius: "2px 2px 0 0",
-              }}
-              className="animate-pulse"
-            />
-            <div
-              style={{
-                width: "100%",
-                height: `${h * 0.6}%`,
-                background: "var(--color-app-skeleton)",
-                borderRadius: "0 0 2px 2px",
-              }}
-              className="animate-pulse"
-            />
-          </div>
+            className="flex-1 rounded-sm bg-app-skeleton animate-pulse"
+            style={{ height: `${h * 0.5}%` }}
+          />
         ))}
       </div>
-    );
+    )
+  }
+
+  if (data.length === 0) {
+    return <div className="w-full h-full" />
   }
 
   return (
@@ -90,55 +66,45 @@ export function Waveform({
       aria-valuemin={0}
       aria-valuemax={Math.round(duration)}
       tabIndex={0}
-      onMouseUp={(e) => (e.target as HTMLInputElement).blur()}
-      className="w-full h-16 flex items-end gap-px cursor-pointer select-none focus:outline-none"
-      style={{ height: "64px", background: "transparent" }}
+      className="w-full h-full flex items-end gap-0.5 cursor-pointer select-none focus:outline-none"
       onClick={handleClick}
       onKeyDown={handleKeyDown}
+      onMouseMove={handleMouseMove}
+      onMouseLeave={handleMouseLeave}
     >
       {data.map((v, i) => {
-        const barProgress = i / data.length;
-        const played = barProgress < progress;
-        const isHead = Math.abs(barProgress - progress) < 0.015;
-        const barHeight = Math.max(4, v * 100);
-        const color = isHead
-          ? 'var(--color-app-accent)'
-          : played
-          ? 'var(--color-app-accent-played)'
-          : 'var(--color-app-waveform)'
+        const barProgress = i / data.length
+        const played = barProgress < progress
+        const isHead = Math.abs(barProgress - progress) < 0.015
+        const isHoverPreview = hoverPct !== null && barProgress <= hoverPct && !played
+
+        const barHeight = Math.min(MAX_BAR_HEIGHT, Math.max(MIN_BAR_HEIGHT, v * 100))
+
+        let color = 'var(--color-app-waveform)'
+        if (isHead) color = 'var(--color-app-text)'
+        else if (played) {
+          // if hovering on played territory, dim bars between hover and head
+          if (hoverPct !== null && barProgress >= hoverPct) {
+            color = 'var(--color-app-accent-rewind)' // dimmer played color
+          } else {
+            color = 'var(--color-app-accent)'
+          }
+        } else if (isHoverPreview) {
+          color = 'var(--color-app-accent-dim)'
+        }
+
         return (
           <div
             key={i}
             style={{
               flex: 1,
-              height: "100%",
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: "1px",
+              height: `${barHeight}%`,
+              background: color,
+              borderRadius: '2px',
             }}
-          >
-            <div
-              style={{
-                width: "100%",
-                height: `${barHeight * 0.4}%`,
-                background: color,
-                opacity: 0.9,
-                borderRadius: "2px 2px 0 0",
-              }}
-            />
-            <div
-              style={{
-                width: "100%",
-                height: `${barHeight * 0.6}%`,
-                background: color,
-                borderRadius: "0 0 2px 2px",
-              }}
-            />
-          </div>
-        );
+          />
+        )
       })}
     </div>
-  );
+  )
 }

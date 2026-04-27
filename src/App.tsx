@@ -20,7 +20,7 @@ function App() {
   const { currentTrack, next, play, prev } = usePlayer(dirs)
 
   return (
-    <div className="bg-slate-800 h-screen font-mono flex flex-col overflow-hidden">
+    <div className="bg-app-bg h-screen font-mono flex flex-col overflow-hidden">
       <Header
         query={query}
         scanState={scanState}
