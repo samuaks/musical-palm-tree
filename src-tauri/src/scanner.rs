@@ -15,6 +15,7 @@ pub struct MediaFile {
     duration_secs: f64,
     size_bytes: u64,
     art_path: Option<String>,
+    created_at: u64
 }
 
 #[derive(serde::Serialize)]
@@ -106,6 +107,15 @@ fn extract_and_cache_art(path: &str, cache_dir: &PathBuf, hash: &str) -> Option<
     Some(cache_file.to_string_lossy().to_string())
 }
 
+fn read_created_at(path: &str) -> u64 {
+    std::fs::metadata(path)
+        .ok()
+        .and_then(|m| m.created().ok())
+        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0)
+}
+
 #[tauri::command]
 pub async fn scan_media(app: tauri::AppHandle) -> ScanResult {
     let start = std::time::Instant::now();
@@ -184,6 +194,7 @@ pub async fn scan_media(app: tauri::AppHandle) -> ScanResult {
                     duration_secs,
                     size_bytes,
                     art_path,
+                    created_at: read_created_at(&entry.path)
                 };
 
                 // clone entry since we only have a borrowed reference
