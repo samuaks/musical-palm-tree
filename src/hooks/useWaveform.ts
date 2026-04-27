@@ -9,10 +9,16 @@ export function useWaveform() {
     setWaveformData([])
     setLoading(true)
     try {
-      const result = await invoke<{ samples: number[] }>('generate_waveform', {
-        path,
-      })
-      setWaveformData(result.samples)
+      const result = await invoke<{ samples: number[] }>('generate_waveform', { path })
+
+      const data = result.samples
+      const max = Math.max(...data)
+      const min = Math.min(...data)
+      const range = max - min || 1
+
+      const normalized = data.map((v) => (v - min) / range).map((v) => Math.pow(v, 1.3))
+
+      setWaveformData(normalized)
     } catch (e) {
       console.error('waveform error:', e)
       setWaveformData(Array.from({ length: 100 }, () => 0.5))

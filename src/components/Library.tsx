@@ -13,15 +13,12 @@ interface LibraryProps {
   durations: Record<string, number>
 }
 
-
-
 export function Library({ dirs, query, currentTrack, onPlay, scanState, durations }: LibraryProps) {
   const filtered = dirs
 
-  const {isCollapsed, toggle} = useCollapsed()
+  const { isCollapsed, toggle } = useCollapsed()
 
-
- if (scanState === 'scanning' && dirs.length === 0) {
+  if (scanState === 'scanning' && dirs.length === 0) {
     return (
       <div className="flex-1 overflow-y-auto py-2">
         {Array.from({ length: 3 }).map((_, i) => (
@@ -34,9 +31,7 @@ export function Library({ dirs, query, currentTrack, onPlay, scanState, duration
   return (
     <div className="flex-1 overflow-y-auto py-2">
       {scanState === 'scanning' && (
-        <div className="px-4 py-1 text-xs text-slate-600 font-mono animate-pulse">
-          scanning...
-        </div>
+        <div className="px-4 py-1 text-xs text-slate-600 font-mono animate-pulse">scanning...</div>
       )}
 
       {filtered.length === 0 && scanState === 'done' && (
@@ -45,11 +40,12 @@ export function Library({ dirs, query, currentTrack, onPlay, scanState, duration
         </div>
       )}
 
-      {filtered.map(dir => (
-        <div key={dir.path} className="mb-4">
-          <div className="px-4 py-1 text-xs text-slate-500 uppercase tracking-widest mt-3">
-            {dir.name}
-          </div>
+      {filtered.map((dir) => (
+        <div key={dir.path} className="mb-2">
+          <SectionHeader
+            name={dir.name}
+            count={dir.files.length + dir.albums.reduce((sum, a) => sum + a.files.length, 0)}
+          />
 
           <TrackList
             files={dir.files}
@@ -59,29 +55,29 @@ export function Library({ dirs, query, currentTrack, onPlay, scanState, duration
             durations={durations}
           />
 
-          {dir.albums.map(album => {
-            const key = `${dir.path}/${album.name}`
+          {dir.albums.map((album) => {
+            const key = `${dir.name}/${album.name}`
             const collapsed = isCollapsed(key)
-             return (
+
+            return (
               <div key={album.name}>
                 <div
                   onClick={() => toggle(key)}
-                  className="flex items-center gap-1 pl-4 pr-4 py-1 mt-2 cursor-pointer hover:bg-white/5 transition-colors"
+                  className="flex items-center gap-3 px-6 mt-3 cursor-pointer hover:bg-app-hover transition-colors py-1"
                 >
-                  <div className="text-slate-600">
+                  <div className="text-app-muted">
                     {collapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
                   </div>
-                  <span className="text-xs text-slate-400 tracking-wide">
+                  <span className="text-xs font-mono text-app-secondary tracking-wide shrink-0">
                     {album.name}
                   </span>
-                  <span className="ml-2 text-xs text-slate-600 font-mono">
+                  <div className="flex-1 h-px bg-app-border" />
+                  <span className="text-xs font-mono text-app-muted tabular-nums shrink-0">
                     {album.files.length}
                   </span>
                 </div>
 
-                <div className={`pl-4 overflow-hidden transition-all duration-200 ${
-                  collapsed ? 'max-h-0' : 'max-h-2499.75'
-                }`}>
+                {!collapsed && (
                   <TrackList
                     files={album.files}
                     currentTrack={currentTrack}
@@ -89,13 +85,24 @@ export function Library({ dirs, query, currentTrack, onPlay, scanState, duration
                     query={query}
                     durations={durations}
                   />
-                </div>
+                )}
               </div>
             )
-          }
-          )}
+          })}
         </div>
       ))}
+    </div>
+  )
+}
+
+function SectionHeader({ name, count }: { name: string; count: number }) {
+  return (
+    <div className="flex items-center gap-3 px-6 mt-6 mb-2">
+      <span className="text-xs font-mono text-app-accent tracking-widest uppercase shrink-0">
+        {name}
+      </span>
+      <div className="flex-1 h-px bg-app-border" />
+      <span className="text-xs font-mono text-app-muted tabular-nums shrink-0">{count}</span>
     </div>
   )
 }

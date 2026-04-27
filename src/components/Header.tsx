@@ -1,3 +1,4 @@
+import { Search } from 'lucide-react'
 import { ScanMetaData, ScanState } from '../types'
 
 interface HeaderProps {
@@ -5,42 +6,70 @@ interface HeaderProps {
   onSearch: (q: string) => void
   scanMeta: ScanMetaData | null
   scanState: ScanState
-  liveCount?: number
+  liveCount: number
 }
 
 export function Header({ query, onSearch, scanMeta, scanState, liveCount }: HeaderProps) {
   return (
-    <div className="shrink-0 px-4 pt-4 pb-3 border-b border-slate-700">
-      <span className="text-teal-400 font-bold tracking-wide text-sm">PlayMusic</span>
-      <div className="text-xs font-mono mt-1">
-        {scanState === 'scanning' && !scanMeta && (
-          <div className="flex items-center gap-2 mt-1">
-            <div className="w-1.5 h-1.5 rounded-full bg-teal-400 animate-pulse" />
-            <span className="text-xs text-app-muted font-mono animate-pulse">
-              scanning library...{' '}
-              {liveCount && <span className="text-app-text">{liveCount} files</span>}
+    <div className="shrink-0 px-6 pt-5 pb-4 border-b border-app-border" data-tauri-drag-region>
+      {/* top row — logo + stats */}
+      <div className="flex items-center gap-4 mb-4">
+        <div className="flex items-center gap-2">
+          <div className="w-5 h-5 rounded-full border-2 border-app-accent flex items-center justify-center">
+            <div className="w-1 h-1 rounded-full bg-app-accent" />
+          </div>
+          <span className="text-app-accent font-mono font-bold text-sm tracking-wide">
+            PlayMusic
+          </span>
+        </div>
+
+        {scanMeta && (
+          <div className="flex items-center gap-3 text-xs font-mono text-app-muted">
+            <span className="text-app-text">{scanMeta.total_files}</span>
+            <span>files</span>
+            <span className="text-app-muted">·</span>
+            <span className="text-app-text">{scanMeta.total_albums}</span>
+            <span>albums</span>
+            <span className="text-app-muted">·</span>
+            <span className="text-app-text">{scanMeta.total_directories}</span>
+            <span>dirs</span>
+            <span className="text-app-muted">·</span>
+            <span className="text-app-text">{scanMeta.duration_ms}ms</span>
+            {scanMeta.total_duplicates > 0 && (
+              <>
+                <span className="text-app-muted">·</span>
+                <span className="text-app-accent font-bold">
+                  {scanMeta.total_duplicates} duplicates
+                </span>
+              </>
+            )}
+          </div>
+        )}
+
+        {scanState === 'scanning' && (
+          <div className="flex items-center gap-2">
+            <div className="w-1.5 h-1.5 rounded-full bg-app-accent animate-pulse" />
+            <span className="text-xs text-app-muted font-mono">
+              scanning... {liveCount > 0 && `${liveCount} files`}
             </span>
           </div>
         )}
-        {scanMeta && (
-          <span className="text-app-muted">
-            {scanMeta.total_files} files · {scanMeta.total_albums} albums ·{' '}
-            {scanMeta.total_directories} dirs · {scanMeta.duration_ms}ms
-            {scanMeta.total_duplicates > 0 && (
-              <span className="text-amber-600 ml-2">· {scanMeta.total_duplicates} duplicates</span>
-            )}
-          </span>
-        )}
       </div>
-      <div className="flex items-center gap-2 mt-3">
-        <span className="text-teal-400 text-sm">{'>'}</span>
+
+      {/* search bar row */}
+      <div className="flex items-center gap-3 px-3 py-2 rounded border border-app-border hover:border-app-accent-dim transition-colors focus-within:border-app-accent">
+        <Search size={16} className="text-app-muted shrink-0" />
         <input
           type="text"
           value={query}
           onChange={(e) => onSearch(e.target.value)}
           placeholder="type to search..."
-          className="bg-transparent text-slate-300 text-sm font-mono placeholder-slate-600 outline-none w-full"
+          className="bg-transparent text-app-text text-sm font-mono placeholder-app-muted outline-none flex-1"
         />
+        <span className="text-xs font-mono text-app-muted shrink-0 hidden md:inline">
+          try <span className="text-app-secondary">shadow</span> or{' '}
+          <span className="text-app-secondary">drumcode</span>
+        </span>
       </div>
     </div>
   )
