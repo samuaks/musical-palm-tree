@@ -3,15 +3,18 @@ use std::collections::HashMap;
 use std::io::{Read, Seek, SeekFrom};
 use std::path::PathBuf;
 use tauri::Emitter;
+use tauri::Manager;
 use walkdir::WalkDir;
+use lofty::file::TaggedFileExt;
 
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, Clone)]
 pub struct MediaFile {
     path: String,
     name: String,
     ext: String,
     duration_secs: f64,
     size_bytes: u64,
+    art_path: Option<String>,
 }
 
 #[derive(serde::Serialize)]
@@ -84,6 +87,25 @@ fn read_size(path: &str) -> u64 {
     std::fs::metadata(path).map(|m| m.len()).unwrap_or(0)
 }
 
+fn extract_and_cache_art(path: &str, cache_dir: &PathBuf, hash: &str) -> Option<String> {
+    let cache_file = cache_dir.join(format!("art_{}.jpg", hash));
+
+    // cache hit — return immediately
+    if cache_file.exists() {
+        return Some(cache_file.to_string_lossy().to_string());
+    }
+
+    // cache miss — try to extract
+    let tagged_file = lofty::read_from_path(path).ok()?;
+    let tag = tagged_file.primary_tag()?;
+    let picture = tag.pictures().first()?;
+
+    std::fs::create_dir_all(cache_dir).ok()?;
+    std::fs::write(&cache_file, picture.data()).ok()?;
+
+    Some(cache_file.to_string_lossy().to_string())
+}
+
 #[tauri::command]
 pub async fn scan_media(app: tauri::AppHandle) -> ScanResult {
     let start = std::time::Instant::now();
@@ -91,6 +113,8 @@ pub async fn scan_media(app: tauri::AppHandle) -> ScanResult {
     let video_ext = ["mp4", "mkv", "webm", "avi", "mov"];
     let allowed_dirs = ["Downloads", "Music", "Videos", "Desktop", "Documents"];
     let home = dirs::home_dir().unwrap_or(PathBuf::from("/"));
+    let cache_dir = app.path().app_cache_dir().unwrap_or(PathBuf::from("./cache"));
+
 
     // phase 1 — single-threaded walk to collect entries
     let entries: Vec<Entry> = WalkDir::new(&home)
@@ -150,6 +174,8 @@ pub async fn scan_media(app: tauri::AppHandle) -> ScanResult {
                 let duration_secs = 0.0;
                 let size_bytes = read_size(&entry.path);
                 let hash = partial_hash(&entry.path);
+                let art_path = hash.as_ref()
+                .and_then(|h| extract_and_cache_art(&entry.path, &cache_dir, h));
 
                 let file = MediaFile {
                     path: entry.path.clone(),
@@ -157,6 +183,7 @@ pub async fn scan_media(app: tauri::AppHandle) -> ScanResult {
                     ext: entry.ext.clone(),
                     duration_secs,
                     size_bytes,
+                    art_path,
                 };
 
                 // clone entry since we only have a borrowed reference

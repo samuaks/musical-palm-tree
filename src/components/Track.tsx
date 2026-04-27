@@ -1,5 +1,6 @@
 import { Music, Video } from 'lucide-react'
 import { MediaFile } from '../types'
+import { convertFileSrc } from '@tauri-apps/api/core'
 
 interface TrackProps {
   file: MediaFile
@@ -51,9 +52,20 @@ return (
       isPlaying ? 'border-l-2 border-teal-400' : 'border-l-2 border-transparent'
     }`}
   >
-    <div className="text-slate-600 shrink-0">
-      {isVideo ? <Video size={12} /> : <Music size={12} />}
-    </div>
+  <div className="shrink-0 w-6 h-6 flex items-center justify-center rounded overflow-hidden bg-app-border">
+    {file.art_path ? (
+      <img
+        src={convertFileSrc(file.art_path)}
+        alt=""
+        className="w-full h-full object-cover"
+        loading="lazy"
+      />
+    ) : (
+      <div className="text-app-muted">
+        {isVideo ? <Video size={12} /> : <Music size={12} />}
+      </div>
+    )}
+  </div>
 
     <span className={`text-sm font-mono flex-1 truncate min-w-0 ${isPlaying ? 'text-teal-400' : 'text-slate-300'}`}>
       {highlight(displayName, query)}
