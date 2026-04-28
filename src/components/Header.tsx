@@ -1,5 +1,6 @@
 import { Search } from 'lucide-react'
 import { useAppStore } from '../store'
+import { ThemeToggle } from './ThemeToggle'
 
 export function Header() {
   const query = useAppStore((s) => s.query)
@@ -52,6 +53,9 @@ export function Header() {
             </span>
           </div>
         )}
+        <div className="ml-auto">
+          <ThemeToggle />
+        </div>
       </div>
 
       {/* search bar row */}

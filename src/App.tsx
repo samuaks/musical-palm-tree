@@ -5,6 +5,7 @@ import { PlayerBar } from './components/PlayerBar'
 import { useScan } from './hooks/useScan'
 import { useDurations } from './hooks/useDurations'
 import { VideoPane } from './components/VideoPane'
+import { ScrollToActivate } from './components/ScrollToActivate'
 
 function App() {
   useScan()
@@ -19,6 +20,7 @@ function App() {
         <VideoPane />
       </div>
       <PlayerBar />
+      <ScrollToActivate />
     </div>
   )
 }

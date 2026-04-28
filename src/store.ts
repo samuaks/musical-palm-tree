@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { Directory, MediaFile, ScanMetaData, ScanState } from './types'
 
+type Theme = 'dark' | 'light'
 interface AppState {
   // scan state
   dirs: Directory[]
@@ -16,6 +17,9 @@ interface AppState {
   query: string
   durations: Record<string, number>
 
+  // theme
+  theme: Theme
+
   // actions
   setDirs: (dirs: Directory[]) => void
   setScanMeta: (meta: ScanMetaData | null) => void
@@ -25,6 +29,7 @@ interface AppState {
   setPlaying: (playing: boolean) => void
   setQuery: (query: string) => void
   setDuration: (path: string, duration: number) => void
+  setTheme: (theme: Theme) => void
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -36,6 +41,8 @@ export const useAppStore = create<AppState>((set) => ({
   playing: false,
   query: '',
   durations: {},
+  theme:
+    (typeof window !== 'undefined' && (localStorage.getItem('playmusic-theme') as Theme)) || 'dark',
 
   setDirs: (dirs) => set({ dirs }),
   setScanMeta: (scanMeta) => set({ scanMeta }),
@@ -46,4 +53,14 @@ export const useAppStore = create<AppState>((set) => ({
   setQuery: (query) => set({ query }),
   setDuration: (path, duration) =>
     set((state) => ({ durations: { ...state.durations, [path]: duration } })),
+  setTheme: (theme) => {
+    localStorage.setItem('playmusic-theme', theme)
+    document.documentElement.dataset.theme = theme
+    set({ theme })
+  },
 }))
+
+if (typeof window !== 'undefined') {
+  const initial = (localStorage.getItem('playmusic-theme') as Theme) || 'dark'
+  document.documentElement.dataset.theme = initial
+}
