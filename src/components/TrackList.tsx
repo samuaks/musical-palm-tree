@@ -3,28 +3,15 @@ import { Track } from './Track'
 
 interface TrackListProps {
   files: MediaFile[]
-  currentTrack: MediaFile | null
-  query: string
-  onPlay: (file: MediaFile) => void
-
-  durations: Record<string, number>
 }
 
-export function TrackList({ files, currentTrack, query, onPlay, durations }: TrackListProps) {
+export function TrackList({ files }: TrackListProps) {
   if (files.length === 0) return null
 
   return (
     <div className="flex flex-col overflow-y-auto">
       {files.map((file, i) => (
-        <Track
-          index={i}
-          key={file.path}
-          file={file}
-          query={query}
-          onPlay={onPlay}
-          durations={durations}
-          isPlaying={currentTrack?.path === file.path}
-        />
+        <Track index={i} key={file.path} file={file} />
       ))}
     </div>
   )

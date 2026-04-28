@@ -1,20 +1,17 @@
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import { useCollapsed } from '../hooks/useCollapsed'
-import { Directory, MediaFile, ScanState } from '../types'
 import { AlbumSkeleton } from './Skeleton'
 import { TrackList } from './TrackList'
+import { useAppStore } from '../store'
+import { useMemo } from 'react'
+import { filterDirs } from '../utils/filterDirs'
 
-interface LibraryProps {
-  dirs: Directory[]
-  query: string
-  currentTrack: MediaFile | null
-  onPlay: (file: MediaFile) => void
-  scanState: ScanState
-  durations: Record<string, number>
-}
+export function Library() {
+  const dirs = useAppStore((s) => s.dirs)
+  const query = useAppStore((s) => s.query)
+  const scanState = useAppStore((s) => s.scanState)
 
-export function Library({ dirs, query, currentTrack, onPlay, scanState, durations }: LibraryProps) {
-  const filtered = dirs
+  const filtered = useMemo(() => filterDirs(dirs, query), [dirs, query])
 
   const { isCollapsed, toggle } = useCollapsed()
 
@@ -47,13 +44,7 @@ export function Library({ dirs, query, currentTrack, onPlay, scanState, duration
             count={dir.files.length + dir.albums.reduce((sum, a) => sum + a.files.length, 0)}
           />
 
-          <TrackList
-            files={dir.files}
-            currentTrack={currentTrack}
-            onPlay={onPlay}
-            query={query}
-            durations={durations}
-          />
+          <TrackList files={dir.files} />
 
           {dir.albums.map((album) => {
             const key = `${dir.name}/${album.name}`
@@ -77,15 +68,7 @@ export function Library({ dirs, query, currentTrack, onPlay, scanState, duration
                   </span>
                 </div>
 
-                {!collapsed && (
-                  <TrackList
-                    files={album.files}
-                    currentTrack={currentTrack}
-                    onPlay={onPlay}
-                    query={query}
-                    durations={durations}
-                  />
-                )}
+                {!collapsed && <TrackList files={album.files} />}
               </div>
             )
           })}

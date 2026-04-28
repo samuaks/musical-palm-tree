@@ -1,16 +1,14 @@
-import { useState, useMemo } from 'react'
-import { Directory, MediaFile } from '../types'
+import { useMemo } from 'react'
+import { useAppStore } from '../store'
 
-export function usePlayer(dirs: Directory[]) {
-  const [currentTrack, setCurrentTrack] = useState<MediaFile | null>(null)
+export function usePlayer() {
+  const currentTrack = useAppStore((s) => s.currentTrack)
+  const setCurrentTrack = useAppStore((s) => s.setCurrentTrack)
+  const dirs = useAppStore((s) => s.dirs)
 
   const allTracks = useMemo(() => {
     return dirs.flatMap((dir) => [...dir.files, ...dir.albums.flatMap((album) => album.files)])
   }, [dirs])
-
-  function play(file: MediaFile) {
-    setCurrentTrack(file)
-  }
 
   function next() {
     if (!currentTrack) return
@@ -24,5 +22,5 @@ export function usePlayer(dirs: Directory[]) {
     if (idx > 0) setCurrentTrack(allTracks[idx - 1])
   }
 
-  return { currentTrack, play, next, prev }
+  return { next, prev }
 }

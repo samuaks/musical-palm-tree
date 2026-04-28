@@ -1,14 +1,12 @@
 import { Search } from 'lucide-react'
 import { useAppStore } from '../store'
 
-
 export function Header() {
-
-    const query = useAppStore(s => s.query)
-  const setQuery = useAppStore(s => s.setQuery)
-  const scanMeta = useAppStore(s => s.scanMeta)
-  const scanState = useAppStore(s => s.scanState)
-  const liveCount = useAppStore(s => s.liveCount)
+  const query = useAppStore((s) => s.query)
+  const setQuery = useAppStore((s) => s.setQuery)
+  const scanMeta = useAppStore((s) => s.scanMeta)
+  const scanState = useAppStore((s) => s.scanState)
+  const liveCount = useAppStore((s) => s.liveCount)
 
   return (
     <div className="shrink-0 px-6 pt-5 pb-4 border-b border-app-border" data-tauri-drag-region>

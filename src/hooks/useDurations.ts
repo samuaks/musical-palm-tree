@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from 'react'
-import { Directory } from '../types'
+import { useEffect, useRef } from 'react'
 import { convertFileSrc } from '@tauri-apps/api/core'
+import { useAppStore } from '../store'
 
 function getDuration(path: string): Promise<number> {
   return new Promise((resolve) => {
@@ -18,19 +18,20 @@ function getDuration(path: string): Promise<number> {
 
 const CONCURRENT_LIMIT = 6
 
-export function useDurations(dirs: Directory[]) {
-  const [durations, setDurations] = useState<Record<string, number>>({})
-
+export function useDurations() {
   const queue = useRef<string[]>([])
-
   const inFlight = useRef(0)
+
+  const dirs = useAppStore((s) => s.dirs)
+  const setDuration = useAppStore((s) => s.setDuration)
 
   useEffect(() => {
     const allFiles = dirs.flatMap((d) => [
       ...d.files.map((f) => f.path),
       ...d.albums.flatMap((a) => a.files.map((f) => f.path)),
     ])
-    queue.current = allFiles.filter((path) => !(path in durations))
+    const existing = useAppStore.getState().durations
+    queue.current = allFiles.filter((path) => !(path in existing))
     pump()
   }, [dirs])
 
@@ -39,11 +40,10 @@ export function useDurations(dirs: Directory[]) {
       const path = queue.current.shift()!
       inFlight.current++
       getDuration(path).then((duration) => {
-        setDurations((prev) => ({ ...prev, [path]: duration }))
+        setDuration(path, duration)
         inFlight.current--
         pump()
       })
     }
   }
-  return durations
 }

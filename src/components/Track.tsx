@@ -2,14 +2,11 @@ import { Music, Video } from 'lucide-react'
 import { MediaFile } from '../types'
 import { isVideo } from '../constants'
 import { PlayingIndicator } from './PlayingIndicator'
+import { useAppStore } from '../store'
 
 interface TrackProps {
   file: MediaFile
   index: number
-  onPlay: (file: MediaFile) => void
-  isPlaying?: boolean
-  query?: string
-  durations: Record<string, number>
 }
 
 function highlight(text: string, query: string) {
@@ -34,31 +31,32 @@ function formatDuration(secs: number): string {
   return `${m}:${s.toString().padStart(2, '0')}`
 }
 
-export function Track({
-  file,
-  index,
-  onPlay,
-  isPlaying = false,
-  query = '',
-  durations,
-}: TrackProps) {
+export function Track({ file, index }: TrackProps) {
+  const currentTrack = useAppStore((s) => s.currentTrack)
+  const setCurrentTrack = useAppStore((s) => s.setCurrentTrack)
+  const playing = useAppStore((s) => s.playing)
+  const query = useAppStore((s) => s.query)
+  const duration = useAppStore((s) => s.durations[file.path] ?? 0)
+
+  const isActive = currentTrack?.path == file.path
+  const isCurrentlyPlaying = isActive && playing
+
   const isVideoFile = isVideo(file.ext)
   const displayName = file.name.replace(/\.[^/.]+$/, '')
-  const duration = durations[file.path] ?? 0
 
-  const color = isPlaying ? 'var(--color-app-accent)' : ''
+  const color = isCurrentlyPlaying ? 'var(--color-app-accent)' : ''
 
   return (
     <div
-      onClick={() => onPlay(file)}
+      onClick={() => setCurrentTrack(file)}
       className={`group flex items-center gap-4 px-6 py-2 cursor-pointer transition-colors ${
-        isPlaying ? 'bg-app-selected' : 'hover:bg-app-hover'
+        isActive ? 'bg-app-selected' : 'hover:bg-app-hover'
       }`}
     >
       {/* index or playing indicator */}
       <div className="w-8 text-right shrink-0">
-        {isPlaying ? (
-          <PlayingIndicator />
+        {isActive ? (
+          <PlayingIndicator playing={isCurrentlyPlaying} />
         ) : (
           <span className="text-xs font-mono text-app-muted tabular-nums">
             {String(index + 1).padStart(2, '0')}
@@ -74,7 +72,7 @@ export function Track({
       {/* track name */}
       <span
         className={`text-sm font-mono flex-1 truncate min-w-0 ${
-          isPlaying ? 'text-app-accent' : 'text-app-text'
+          isActive ? 'text-app-accent' : 'text-app-text'
         }`}
       >
         {highlight(displayName, query)}

@@ -1,10 +1,11 @@
+import { isVideo } from '../constants'
 import { useResizable } from '../hooks/useResizable'
+import { useAppStore } from '../store'
 
-interface VideoPaneProps {
-  visible: boolean
-}
+export function VideoPane() {
+  const currentTrack = useAppStore((s) => s.currentTrack)
+  const visible = !!(currentTrack && isVideo(currentTrack.ext))
 
-export function VideoPane({ visible }: VideoPaneProps) {
   const { size: width, startDrag } = useResizable({
     defaultSize: 480,
     min: 240,
