@@ -1,14 +1,16 @@
 import { useState, useEffect, useRef } from 'react'
 import { convertFileSrc } from '@tauri-apps/api/core'
-import { MediaFile } from '../types'
 import { useVolume } from './useVolume'
 import { isVideo } from '../constants'
+import { useAppStore } from '../store'
 
 export function useAudioPlayer(
-  track: MediaFile | null,
   videoRef: React.RefObject<HTMLVideoElement | null>,
   onEnded?: () => void
 ) {
+  const track = useAppStore((s) => s.currentTrack)
+  const setStorePlaying = useAppStore((s) => s.setPlaying)
+
   const audioRef = useRef<HTMLAudioElement>(new Audio())
   const [playing, setPlaying] = useState(false)
   const [duration, setDuration] = useState(0)
@@ -25,6 +27,10 @@ export function useAudioPlayer(
     if (trackIsVideo && videoRef.current) return videoRef.current
     return audioRef.current
   }
+
+  useEffect(() => {
+    setStorePlaying(playing)
+  }, [playing])
 
   useEffect(() => {
     if (!track) return

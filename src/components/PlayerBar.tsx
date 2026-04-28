@@ -1,18 +1,13 @@
 import { useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { MediaFile } from '../types'
 import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX } from 'lucide-react'
 import { useAudioPlayer } from '../hooks/useAudioPlayer'
 import { useWaveform } from '../hooks/useWaveform'
 import { useResizable } from '../hooks/useResizable'
 import { Waveform } from './Waveform'
 import { isVideo } from '../constants'
-
-interface PlayerBarProps {
-  track: MediaFile | null
-  onNext?: () => void
-  onPrev?: () => void
-}
+import { usePlayer } from '../hooks/usePlayer'
+import { useAppStore } from '../store'
 
 const MIN_HEIGHT = 160
 
@@ -22,7 +17,9 @@ function formatTime(s: number) {
   return `${m}:${sec.toString().padStart(2, '0')}`
 }
 
-export function PlayerBar({ track, onNext, onPrev }: PlayerBarProps) {
+export function PlayerBar() {
+  const track = useAppStore((s) => s.currentTrack)
+  const { next, prev } = usePlayer()
   const { size: height, startDrag } = useResizable({
     defaultSize: MIN_HEIGHT,
     axis: 'vertical',
@@ -31,7 +28,8 @@ export function PlayerBar({ track, onNext, onPrev }: PlayerBarProps) {
 
   const videoRef = useRef<HTMLVideoElement>(null)
   const { playing, duration, currentTime, toggle, seek, volume, changeVolume, toggleMute } =
-    useAudioPlayer(track, videoRef, onNext)
+    useAudioPlayer(videoRef, next)
+
   const { waveformData, generateWaveform, loading } = useWaveform()
 
   const displayName = track?.name.replace(/\.[^/.]+$/, '') ?? 'No track selected'
@@ -77,7 +75,7 @@ export function PlayerBar({ track, onNext, onPrev }: PlayerBarProps) {
 
           <div className="flex items-center gap-4">
             <button
-              onClick={onPrev}
+              onClick={prev}
               className="text-app-secondary hover:text-app-text transition-colors"
             >
               <SkipBack size={16} />
@@ -91,7 +89,7 @@ export function PlayerBar({ track, onNext, onPrev }: PlayerBarProps) {
             </button>
 
             <button
-              onClick={onNext}
+              onClick={next}
               className="text-app-secondary hover:text-app-text transition-colors"
             >
               <SkipForward size={16} />
