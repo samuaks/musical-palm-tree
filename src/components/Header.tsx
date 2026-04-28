@@ -1,15 +1,15 @@
 import { Search } from 'lucide-react'
-import { ScanMetaData, ScanState } from '../types'
+import { useAppStore } from '../store'
 
-interface HeaderProps {
-  query: string
-  onSearch: (q: string) => void
-  scanMeta: ScanMetaData | null
-  scanState: ScanState
-  liveCount: number
-}
 
-export function Header({ query, onSearch, scanMeta, scanState, liveCount }: HeaderProps) {
+export function Header() {
+
+    const query = useAppStore(s => s.query)
+  const setQuery = useAppStore(s => s.setQuery)
+  const scanMeta = useAppStore(s => s.scanMeta)
+  const scanState = useAppStore(s => s.scanState)
+  const liveCount = useAppStore(s => s.liveCount)
+
   return (
     <div className="shrink-0 px-6 pt-5 pb-4 border-b border-app-border" data-tauri-drag-region>
       {/* top row — logo + stats */}
@@ -62,7 +62,7 @@ export function Header({ query, onSearch, scanMeta, scanState, liveCount }: Head
         <input
           type="text"
           value={query}
-          onChange={(e) => onSearch(e.target.value)}
+          onChange={(e) => setQuery(e.target.value)}
           placeholder="type to search..."
           className="bg-transparent text-app-text text-sm font-mono placeholder-app-muted outline-none flex-1"
         />

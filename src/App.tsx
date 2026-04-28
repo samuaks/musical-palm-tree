@@ -11,8 +11,7 @@ import { isVideo } from './constants'
 import { VideoPane } from './components/VideoPane'
 
 function App() {
-  const [query, setQuery] = useState('')
-  const { scanMeta, dirs, liveCount, scanState } = useScan()
+  useScan()
   const durations = useDurations(dirs)
 
   const filteredDirs = useMemo(() => filterDirs(dirs, query), [dirs, query])
@@ -22,11 +21,6 @@ function App() {
   return (
     <div className="bg-app-bg h-screen font-mono flex flex-col overflow-hidden">
       <Header
-        query={query}
-        scanState={scanState}
-        onSearch={setQuery}
-        scanMeta={scanMeta}
-        liveCount={liveCount}
       />
       <div className="flex-1 flex overflow-hidden">
         <Library
