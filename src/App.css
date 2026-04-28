@@ -4,14 +4,14 @@
   --color-app-bg: #1a1a1a;
   --color-app-surface: #141414;
   --color-app-hover: rgba(255, 255, 255, 0.05);
-  --color-app-selected: rgba(94, 234, 212, 0.08);
+  --color-app-selected: rgba(251, 113, 133, 0.08);
   --color-app-text: #e5e5e5;
   --color-app-secondary: #a3a3a3;
   --color-app-muted: #525252;
-  --color-app-accent: #5eead4;
-  --color-app-accent-played: #14b8a6;
-  --color-app-accent-rewind: #0f766e;
-  --color-app-accent-dim: rgba(94, 234, 212, 0.3);
+  --color-app-accent: #fb7185;
+  --color-app-accent-played: #f43f5e;
+  --color-app-accent-rewind: #be123c;
+  --color-app-accent-dim: rgba(251, 113, 133, 0.3);
   --color-app-border: #2e2e2e;
   --color-app-skeleton: #2e2e2e;
   --color-app-waveform: #404040;
@@ -20,18 +20,39 @@
   --color-app-bg: #fafaf9; /* near-white, slight warm tone */
   --color-app-surface: #ffffff; /* pure white for surfaces */
   --color-app-hover: rgba(0, 0, 0, 0.05);
-  --color-app-selected: rgba(13, 148, 136, 0.1);
+  --color-app-selected: rgba(244, 63, 94, 0.1);
   --color-app-text: #18181b; /* near-black for max contrast */
   --color-app-secondary: #52525b; /* dark gray for secondary text */
   --color-app-muted: #a1a1aa; /* lighter muted gray */
-  --color-app-accent: #0d9488; /* darker teal so it pops on white */
-  --color-app-accent-played: #14b8a6;
-  --color-app-accent-rewind: #5eead4;
-  --color-app-accent-dim: rgba(13, 148, 136, 0.3);
   --color-app-border: #e4e4e7; /* subtle gray for borders/dividers */
   --color-app-skeleton: #e4e4e7;
   --color-app-waveform: #d4d4d8; /* lighter waveform unplayed bars */
 }
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  background: linear-gradient(180deg, #0d0d0d 0%, #1a1a1a 50%, #2a1f24 100%);
+}
+[data-theme='light'] body {
+  background: linear-gradient(180deg, #fafaf9 0%, #fce8e8 100%);
+}
+/* 
+  Subtle warm: background: linear-gradient(180deg, #1a1a1a 0%, #2a1f24 100%);
+  Cooler, blue purple: background: linear-gradient(180deg, #0f0f1a 0%, #1a1a2e 100%);
+  Dark teal vibe matching app accent:
+  background: linear-gradient(180deg, #0a1414 0%, #1a2526 100%);
+  background: linear-gradient(180deg, #0d0d0d 0%, #1a1a1a 50%, #2a1f24 100%);
+  background: linear-gradient(135deg, #1a1a1a 0%, #2a1a24 50%, #1a1a2e 100%);
+  background: radial-gradient(ellipse at top, #2a2a2a 0%, #0d0d0d 70%);
+  background: radial-gradient(ellipse at top, #2a2a2a 0%, #0d0d0d 70%);
+  background: radial-gradient(ellipse at center, #1f1f1f 0%, #0d0d0d 100%);
+
+*/
 
 ::-webkit-scrollbar {
   width: 4px;

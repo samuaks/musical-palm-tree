@@ -52,7 +52,7 @@ export function PlayerBar() {
       )}
 
       <div
-        className="flex flex-col bg-app-bg border-t border-app-border relative"
+        className="flex flex-col border-t border-app-border relative"
         style={{ height: `${height}px` }}
       >
         {/* drag handle */}

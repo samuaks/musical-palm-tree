@@ -57,15 +57,15 @@ export function Track({ file, index }: TrackProps) {
         {isActive ? (
           <PlayingIndicator playing={isCurrentlyPlaying} />
         ) : (
-          <span className="text-xs font-mono text-app-muted tabular-nums">
+          <span className="text-xs font-mono text-app-secondary tabular-nums">
             {String(index + 1).padStart(2, '0')}
           </span>
         )}
       </div>
 
       {/* type icon */}
-      <div className={isCurrentlyPlaying ? 'text-app-accent' : 'text-app-muted'}>
-        {isVideoFile ? <Video size={14} /> : <Music size={14} />}
+      <div className={isCurrentlyPlaying ? 'text-app-accent' : 'text-app-secondary'}>
+        {isVideoFile ? <Video size={16} /> : <Music size={16} />}
       </div>
 
       {/* track name */}
@@ -78,7 +78,7 @@ export function Track({ file, index }: TrackProps) {
       </span>
 
       {/* duration */}
-      <span className="text-xs font-mono text-app-muted tabular-nums shrink-0">
+      <span className="text-xs font-mono text-app-secondary tabular-nums shrink-0">
         {formatDuration(duration)}
       </span>
     </div>

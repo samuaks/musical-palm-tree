@@ -17,7 +17,7 @@ export function VideoPane() {
   return (
     <div
       id="video-pane"
-      className={`shrink-0 border-l border-app-border bg-app-bg relative ${visible ? '' : 'hidden'}`}
+      className={`shrink-0 border-l border-app-border  relative ${visible ? '' : 'hidden'}`}
       style={{ width: `${width}px` }}
     >
       <div

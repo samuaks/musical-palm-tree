@@ -12,7 +12,7 @@ function App() {
   useDurations()
 
   return (
-    <div className="bg-app-bg h-screen font-mono flex flex-col overflow-hidden">
+    <div className="h-screen font-mono flex flex-col overflow-hidden">
       <Header />
       <div className="flex-1 flex overflow-hidden">
         <Library />
@@ -20,7 +20,6 @@ function App() {
         <VideoPane />
       </div>
       <PlayerBar />
-      <ScrollToActivate />
     </div>
   )
 }

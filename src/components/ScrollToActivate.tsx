@@ -48,7 +48,7 @@ export function ScrollToActivate() {
   return (
     <button
       onClick={scrollToActive}
-      className="fixed top-30 left-20 z-30 flex items-center gap-2 px-3 py-2 rounded-full bg-app-accent text-app-bg text-xs font-mono hover:scale-105 transition-transform shadow-lg"
+      className="absolute top-4 left-2/5 z-30 flex items-center gap-2 px-3 py-2 rounded-full bg-app-accent text-app-bg text-xs font-mono hover:scale-105 transition-transform shadow-lg"
       title="Jump to current track"
     >
       <Music size={12} />
