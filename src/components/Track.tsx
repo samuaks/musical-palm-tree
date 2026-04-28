@@ -44,8 +44,6 @@ export function Track({ file, index }: TrackProps) {
   const isVideoFile = isVideo(file.ext)
   const displayName = file.name.replace(/\.[^/.]+$/, '')
 
-  const color = isCurrentlyPlaying ? 'var(--color-app-accent)' : ''
-
   return (
     <div
       onClick={() => setCurrentTrack(file)}
@@ -54,7 +52,7 @@ export function Track({ file, index }: TrackProps) {
       }`}
     >
       {/* index or playing indicator */}
-      <div className="w-8 text-right shrink-0">
+      <div className="w-8 flex items-center justify-end shrink-0">
         {isActive ? (
           <PlayingIndicator playing={isCurrentlyPlaying} />
         ) : (
@@ -65,8 +63,8 @@ export function Track({ file, index }: TrackProps) {
       </div>
 
       {/* type icon */}
-      <div className="text-app-muted shrink-0">
-        {isVideoFile ? <Video color={color} size={14} /> : <Music color={color} size={14} />}
+      <div className={isCurrentlyPlaying ? 'text-app-accent' : 'text-app-muted'}>
+        {isVideoFile ? <Video size={14} /> : <Music size={14} />}
       </div>
 
       {/* track name */}
