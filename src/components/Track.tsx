@@ -46,6 +46,7 @@ export function Track({ file, index }: TrackProps) {
 
   return (
     <div
+      data-track-path={file.path}
       onClick={() => setCurrentTrack(file)}
       className={`group flex items-center gap-4 px-6 py-2 cursor-pointer transition-colors ${
         isActive ? 'bg-app-selected' : 'hover:bg-app-hover'
