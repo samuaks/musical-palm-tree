@@ -2,6 +2,20 @@ import { create } from 'zustand'
 import { Directory, MediaFile, ScanMetaData, ScanState } from './types'
 
 type Theme = 'dark' | 'light'
+
+const STORAGE_KEY = 'playmusic-collapsed'
+
+function loadCollapsed(): Set<string> {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY)
+    if (!saved) return new Set()
+    const parsed = JSON.parse(saved)
+    if (!Array.isArray(parsed)) return new Set()
+    return new Set(parsed)
+  } catch {
+    return new Set()
+  }
+}
 interface AppState {
   // scan state
   dirs: Directory[]
@@ -20,6 +34,9 @@ interface AppState {
   // theme
   theme: Theme
 
+  //collapsed albums
+  collapsed: Set<string>
+
   // actions
   setDirs: (dirs: Directory[]) => void
   setScanMeta: (meta: ScanMetaData | null) => void
@@ -30,6 +47,7 @@ interface AppState {
   setQuery: (query: string) => void
   setDuration: (path: string, duration: number) => void
   setTheme: (theme: Theme) => void
+  toggleCollapsed: (key: string) => void
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -43,6 +61,7 @@ export const useAppStore = create<AppState>((set) => ({
   durations: {},
   theme:
     (typeof window !== 'undefined' && (localStorage.getItem('playmusic-theme') as Theme)) || 'dark',
+  collapsed: loadCollapsed(),
 
   setDirs: (dirs) => set({ dirs }),
   setScanMeta: (scanMeta) => set({ scanMeta }),
@@ -58,6 +77,14 @@ export const useAppStore = create<AppState>((set) => ({
     document.documentElement.dataset.theme = theme
     set({ theme })
   },
+  toggleCollapsed: (key) =>
+    set((state) => {
+      const next = new Set(state.collapsed)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      localStorage.setItem(STORAGE_KEY, JSON.stringify([...next]))
+      return { collapsed: next }
+    }),
 }))
 
 if (typeof window !== 'undefined') {

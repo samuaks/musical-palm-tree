@@ -1,20 +1,19 @@
 import { ChevronDown, ChevronRight } from 'lucide-react'
-import { useCollapsed } from '../hooks/useCollapsed'
 import { AlbumSkeleton } from './Skeleton'
 import { TrackList } from './TrackList'
 import { useAppStore } from '../store'
 import { useMemo } from 'react'
 import { filterDirs } from '../utils/filterDirs'
-import { ScrollToActivate } from './ScrollToActivate'
+import { ScrollToActive } from './ScrollToActivate'
 
 export function Library() {
   const dirs = useAppStore((s) => s.dirs)
   const query = useAppStore((s) => s.query)
   const scanState = useAppStore((s) => s.scanState)
+  const collapsed = useAppStore((s) => s.collapsed)
+  const toggleCollapsed = useAppStore((s) => s.toggleCollapsed)
 
   const filtered = useMemo(() => filterDirs(dirs, query), [dirs, query])
-
-  const { isCollapsed, toggle } = useCollapsed()
 
   if (scanState === 'scanning' && dirs.length === 0) {
     return (
@@ -28,7 +27,7 @@ export function Library() {
 
   return (
     <div className="flex-1 relative overflow-hidden">
-      <ScrollToActivate />
+      <ScrollToActive />
       <div className="overflow-y-auto h-full py-2">
         {scanState === 'scanning' && (
           <div className="px-4 py-1 text-xs text-slate-600 font-mono animate-pulse">
@@ -53,16 +52,18 @@ export function Library() {
 
             {dir.albums.map((album) => {
               const key = `${dir.name}/${album.name}`
-              const collapsed = isCollapsed(key)
+              const isAlbumCollapsed = collapsed.has(key)
 
               return (
                 <div key={album.name}>
                   <div
-                    onClick={() => toggle(key)}
-                    className="flex items-center gap-3 px-6 mt-3 cursor-pointer hover:bg-app-hover transition-colors py-1"
+                    onClick={() => toggleCollapsed(key)}
+                    className={`flex items-center gap-3 px-6 mt-3 cursor-pointer transition-colors py-1 ${
+                      isAlbumCollapsed ? 'bg-app-hover' : 'hover:bg-app-hover'
+                    }`}
                   >
                     <div className="text-app-muted">
-                      {collapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
+                      {isAlbumCollapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
                     </div>
                     <span className="text-xs font-mono text-app-secondary tracking-wide shrink-0">
                       {album.name}
@@ -73,7 +74,7 @@ export function Library() {
                     </span>
                   </div>
 
-                  {!collapsed && <TrackList files={album.files} />}
+                  {!isAlbumCollapsed && <TrackList files={album.files} />}
                 </div>
               )
             })}

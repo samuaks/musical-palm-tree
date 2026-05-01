@@ -4,7 +4,7 @@
   --color-app-bg: #1a1a1a;
   --color-app-surface: #141414;
   --color-app-hover: rgba(255, 255, 255, 0.05);
-  --color-app-selected: rgba(251, 113, 133, 0.08);
+  --color-app-selected: rgba(251, 113, 133, 0.12);
   --color-app-text: #e5e5e5;
   --color-app-secondary: #a3a3a3;
   --color-app-muted: #525252;
@@ -20,7 +20,7 @@
   --color-app-bg: #fafaf9; /* near-white, slight warm tone */
   --color-app-surface: #ffffff; /* pure white for surfaces */
   --color-app-hover: rgba(0, 0, 0, 0.05);
-  --color-app-selected: rgba(244, 63, 94, 0.1);
+  --color-app-selected: rgba(244, 63, 94, 0.15);
   --color-app-text: #18181b; /* near-black for max contrast */
   --color-app-secondary: #52525b; /* dark gray for secondary text */
   --color-app-muted: #a1a1aa; /* lighter muted gray */
