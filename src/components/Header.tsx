@@ -10,18 +10,9 @@ export function Header() {
   const liveCount = useAppStore((s) => s.liveCount)
 
   return (
-    <div className="shrink-0 px-6 pt-5 pb-4 border-b border-app-border" data-tauri-drag-region>
+    <div className="shrink-0 px-6 pt-5 pb-4 border-b border-app-border">
       {/* top row — logo + stats */}
       <div className="flex items-center gap-4 mb-4">
-        <div className="flex items-center gap-2">
-          <div className="w-5 h-5 rounded-full border-2 border-app-accent flex items-center justify-center">
-            <div className="w-1 h-1 rounded-full bg-app-accent" />
-          </div>
-          <span className="text-app-accent font-mono font-bold text-sm tracking-wide">
-            PlayMusic
-          </span>
-        </div>
-
         {scanMeta && (
           <div className="flex items-center gap-3 text-xs font-mono text-app-muted">
             <span className="text-app-text">{scanMeta.total_files}</span>

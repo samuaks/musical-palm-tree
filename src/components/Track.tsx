@@ -31,6 +31,26 @@ function formatDuration(secs: number): string {
   return `${m}:${s.toString().padStart(2, '0')}`
 }
 
+function formatRelative(ms: number): string {
+  if (ms === 0) return ''
+  const diff = Date.now() - ms
+  const seconds = Math.floor(diff / 1000)
+  const minutes = Math.floor(seconds / 60)
+  const hours = Math.floor(minutes / 60)
+  const days = Math.floor(hours / 24)
+  const weeks = Math.floor(days / 7)
+  const months = Math.floor(days / 30)
+  const years = Math.floor(days / 365)
+
+  if (years > 0) return `${years}y ago`
+  if (months > 0) return `${months}mo ago`
+  if (weeks > 0) return `${weeks}w ago`
+  if (days > 0) return `${days}d ago`
+  if (hours > 0) return `${hours}h ago`
+  if (minutes > 0) return `${minutes}m ago`
+  return 'just now'
+}
+
 export function Track({ file, index }: TrackProps) {
   const currentTrack = useAppStore((s) => s.currentTrack)
   const setCurrentTrack = useAppStore((s) => s.setCurrentTrack)
@@ -77,8 +97,12 @@ export function Track({ file, index }: TrackProps) {
         {highlight(displayName, query)}
       </span>
 
+      <span className="text-sm font-mono text-app-secondary tabular-nums shrink-0 w-16 text-right">
+        {formatRelative(file.created_at)}
+      </span>
+
       {/* duration */}
-      <span className="text-xs font-mono text-app-secondary tabular-nums shrink-0">
+      <span className="text-sm font-mono text-app-secondary tabular-nums text-right w-12 shrink-0">
         {formatDuration(duration)}
       </span>
     </div>

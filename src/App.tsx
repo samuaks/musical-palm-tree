@@ -5,7 +5,7 @@ import { PlayerBar } from './components/PlayerBar'
 import { useScan } from './hooks/useScan'
 import { useDurations } from './hooks/useDurations'
 import { VideoPane } from './components/VideoPane'
-import { ScrollToActivate } from './components/ScrollToActivate'
+import { Titlebar } from './components/TitleBar'
 
 function App() {
   useScan()
@@ -13,6 +13,7 @@ function App() {
 
   return (
     <div className="h-screen font-mono flex flex-col overflow-hidden">
+      <Titlebar />
       <Header />
       <div className="flex-1 flex overflow-hidden">
         <Library />
