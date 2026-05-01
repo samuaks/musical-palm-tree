@@ -65,6 +65,32 @@ export function useAudioPlayer(
 
   useEffect(() => {
     const media = getMedia()
+    if (!media) return
+
+    function handleVolumeChange() {
+      changeVolume(media.volume)
+    }
+
+    function handlePlay() {
+      setStorePlaying(true)
+    }
+    function handlePause() {
+      setStorePlaying(false)
+    }
+
+    media.addEventListener('volumechange', handleVolumeChange)
+    media.addEventListener('play', handlePlay)
+    media.addEventListener('pause', handlePause)
+
+    return () => {
+      media.removeEventListener('volumechange', handleVolumeChange)
+      media.removeEventListener('play', handlePlay)
+      media.removeEventListener('pause', handlePause)
+    }
+  }, [track])
+
+  useEffect(() => {
+    const media = getMedia()
 
     function handleMetadata() {
       setDuration(media.duration)
@@ -97,6 +123,10 @@ export function useAudioPlayer(
       if (e.code === 'ArrowLeft') seek(Math.max(0, currentTime - 5))
       if (e.code === 'ArrowUp') changeVolume(Math.min(1, volume + 0.1))
       if (e.code === 'ArrowDown') changeVolume(Math.max(0, volume - 0.1))
+      if (e.code === 'KeyF' && trackIsVideo && videoRef.current) {
+        if (document.fullscreenElement) document.exitFullscreen()
+        else videoRef.current.requestFullscreen()
+      }
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)

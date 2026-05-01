@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX } from 'lucide-react'
+import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, Maximize } from 'lucide-react'
 import { useAudioPlayer } from '../hooks/useAudioPlayer'
 import { useWaveform } from '../hooks/useWaveform'
 import { useResizable } from '../hooks/useResizable'
@@ -8,6 +8,7 @@ import { Waveform } from './Waveform'
 import { isVideo } from '../constants'
 import { usePlayer } from '../hooks/usePlayer'
 import { useAppStore } from '../store'
+import { useFullscreen } from '../hooks/useFullscreen'
 
 const MIN_HEIGHT = 160
 
@@ -27,6 +28,7 @@ export function PlayerBar() {
   })
 
   const videoRef = useRef<HTMLVideoElement>(null)
+  const { toggle: toggleFullscreen } = useFullscreen(videoRef)
   const { playing, duration, currentTime, toggle, seek, volume, changeVolume, toggleMute } =
     useAudioPlayer(videoRef, next)
 
@@ -47,6 +49,7 @@ export function PlayerBar() {
           ref={videoRef}
           className={`w-full h-full ${track && trackIsVideo ? 'block' : 'hidden'}`}
           style={{ objectFit: 'contain' }}
+          onDoubleClick={toggleFullscreen}
         />,
         document.getElementById('video-pane') ?? document.body
       )}
@@ -114,6 +117,16 @@ export function PlayerBar() {
               className="w-24 accent-app-accent"
             />
           </div>
+
+          {track && trackIsVideo && (
+            <button
+              onClick={toggleFullscreen}
+              className="text-app-muted  hover:text-app-text transition-colors"
+              title="Fullscreen"
+            >
+              <Maximize size={14} />
+            </button>
+          )}
         </div>
 
         <div className="flex-1 px-6 pb-2 min-h-0">
