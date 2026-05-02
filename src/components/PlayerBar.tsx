@@ -129,7 +129,7 @@ export function PlayerBar() {
           )}
         </div>
 
-        <div className="flex-1 px-6 pb-2 min-h-0">
+        <div className="flex-1 px-6 pb-2 min-h-0" style={{ height: '72px' }}>
           <Waveform
             data={waveformData}
             currentTime={currentTime}

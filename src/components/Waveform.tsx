@@ -7,8 +7,8 @@ interface WaveformProps {
   onSeek: (time: number) => void
   loading?: boolean
 }
-const MAX_BAR_HEIGHT = 70
-const MIN_BAR_HEIGHT = 8
+const MAX_BAR_HEIGHT = 80
+const MIN_BAR_HEIGHT = 15
 
 export function Waveform({ data, currentTime, duration, onSeek, loading = false }: WaveformProps) {
   const [hoverPct, setHoverPct] = useState<number | null>(null)
