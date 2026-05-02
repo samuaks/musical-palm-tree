@@ -3,11 +3,11 @@ import { useAppStore } from '../store'
 import { ThemeToggle } from './ThemeToggle'
 
 export function Header() {
-  const query = useAppStore((s) => s.query)
-  const setQuery = useAppStore((s) => s.setQuery)
-  const scanMeta = useAppStore((s) => s.scanMeta)
-  const scanState = useAppStore((s) => s.scanState)
-  const liveCount = useAppStore((s) => s.liveCount)
+  const query = useAppStore((s) => s.spaces.local.query)
+  const setQuery = useAppStore((s) => s.setLocalQuery)
+  const scanMeta = useAppStore((s) => s.spaces.local.scanMeta)
+  const scanState = useAppStore((s) => s.spaces.local.scanState)
+  const liveCount = useAppStore((s) => s.spaces.local.liveCount)
 
   return (
     <div className="shrink-0 px-6 pt-5 pb-4 border-b border-app-border">

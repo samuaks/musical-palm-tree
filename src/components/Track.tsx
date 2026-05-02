@@ -55,8 +55,8 @@ export function Track({ file, index }: TrackProps) {
   const currentTrack = useAppStore((s) => s.currentTrack)
   const setCurrentTrack = useAppStore((s) => s.setCurrentTrack)
   const playing = useAppStore((s) => s.playing)
-  const query = useAppStore((s) => s.query)
-  const duration = useAppStore((s) => s.durations[file.path] ?? 0)
+  const query = useAppStore((s) => s.spaces.local.query)
+  const duration = useAppStore((s) => s.spaces.local.durations[file.path] ?? 0)
 
   const isActive = currentTrack?.path == file.path
   const isCurrentlyPlaying = isActive && playing

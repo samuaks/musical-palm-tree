@@ -1,5 +1,7 @@
-import { Disc3 } from 'lucide-react'
+import { Globe, Home } from 'lucide-react'
 import { JSX, ReactNode } from 'react'
+import { LocalSpace } from './LocalSpace'
+import { OnlineSpace } from './OnlineSpace'
 
 export interface Space {
   id: string
@@ -12,7 +14,13 @@ export const SPACES: Space[] = [
   {
     id: 'local',
     name: 'Local',
-    icon: <Disc3 />,
+    icon: <Home size={20} />,
     Component: LocalSpace,
+  },
+  {
+    id: 'online',
+    name: 'Online',
+    icon: <Globe size={20} />,
+    Component: OnlineSpace,
   },
 ]
