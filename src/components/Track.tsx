@@ -3,7 +3,6 @@ import { MediaFile } from '../types'
 import { isVideo } from '../constants'
 import { PlayingIndicator } from './PlayingIndicator'
 import { selectCurrentTrack, useAppStore } from '../store'
-import { localTrack } from '../api/local'
 import { useLocalFlatTracks } from '../hooks/useLocalFlatTracks'
 
 interface TrackProps {
