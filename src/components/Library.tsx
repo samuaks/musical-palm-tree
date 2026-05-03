@@ -4,14 +4,13 @@ import { TrackList } from './TrackList'
 import { useAppStore } from '../store'
 import { useMemo } from 'react'
 import { filterDirs } from '../utils/filterDirs'
-import { ScrollToActive } from './ScrollToActivate'
 
 export function Library() {
-  const dirs = useAppStore((s) => s.dirs)
-  const query = useAppStore((s) => s.query)
-  const scanState = useAppStore((s) => s.scanState)
-  const collapsed = useAppStore((s) => s.collapsed)
-  const toggleCollapsed = useAppStore((s) => s.toggleCollapsed)
+  const dirs = useAppStore((s) => s.spaces.local.dirs)
+  const query = useAppStore((s) => s.spaces.local.query)
+  const scanState = useAppStore((s) => s.spaces.local.scanState)
+  const collapsed = useAppStore((s) => s.spaces.local.collapsed)
+  const toggleCollapsed = useAppStore((s) => s.toggleLocalCollapsed)
 
   const filtered = useMemo(() => filterDirs(dirs, query), [dirs, query])
 
@@ -26,61 +25,56 @@ export function Library() {
   }
 
   return (
-    <div className="flex-1 relative overflow-hidden">
-      <ScrollToActive />
-      <div className="overflow-y-auto h-full py-2">
-        {scanState === 'scanning' && (
-          <div className="px-4 py-1 text-xs text-slate-600 font-mono animate-pulse">
-            scanning...
-          </div>
-        )}
+    <div className="overflow-y-auto h-full py-2">
+      {scanState === 'scanning' && (
+        <div className="px-4 py-1 text-xs text-slate-600 font-mono animate-pulse">scanning...</div>
+      )}
 
-        {filtered.length === 0 && scanState === 'done' && (
-          <div className="px-4 py-3 text-xs text-slate-600 font-mono">
-            {query ? 'no results.' : 'no media found.'}
-          </div>
-        )}
+      {filtered.length === 0 && scanState === 'done' && (
+        <div className="px-4 py-3 text-xs text-slate-600 font-mono">
+          {query ? 'no results.' : 'no media found.'}
+        </div>
+      )}
 
-        {filtered.map((dir) => (
-          <div key={dir.path} className="mb-2">
-            <SectionHeader
-              name={dir.name}
-              count={dir.files.length + dir.albums.reduce((sum, a) => sum + a.files.length, 0)}
-            />
+      {filtered.map((dir) => (
+        <div key={dir.path} className="mb-2">
+          <SectionHeader
+            name={dir.name}
+            count={dir.files.length + dir.albums.reduce((sum, a) => sum + a.files.length, 0)}
+          />
 
-            <TrackList files={dir.files} />
+          <TrackList files={dir.files} />
 
-            {dir.albums.map((album) => {
-              const key = `${dir.name}/${album.name}`
-              const isAlbumCollapsed = collapsed.has(key)
+          {dir.albums.map((album) => {
+            const key = `${dir.name}/${album.name}`
+            const isAlbumCollapsed = collapsed.has(key)
 
-              return (
-                <div key={album.name}>
-                  <div
-                    onClick={() => toggleCollapsed(key)}
-                    className={`flex items-center gap-3 px-6 mt-3 cursor-pointer transition-colors py-1 ${
-                      isAlbumCollapsed ? 'bg-app-hover' : 'hover:bg-app-hover'
-                    }`}
-                  >
-                    <div className="text-app-muted">
-                      {isAlbumCollapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
-                    </div>
-                    <span className="text-xs font-mono text-app-secondary tracking-wide shrink-0">
-                      {album.name}
-                    </span>
-                    <div className="flex-1 h-px bg-app-border" />
-                    <span className="text-xs font-mono text-app-muted tabular-nums shrink-0">
-                      {album.files.length}
-                    </span>
+            return (
+              <div key={album.name}>
+                <div
+                  onClick={() => toggleCollapsed(key)}
+                  className={`flex items-center gap-3 px-6 mt-3 cursor-pointer transition-colors py-1 ${
+                    isAlbumCollapsed ? 'bg-app-hover' : 'hover:bg-app-hover'
+                  }`}
+                >
+                  <div className="text-app-muted">
+                    {isAlbumCollapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
                   </div>
-
-                  {!isAlbumCollapsed && <TrackList files={album.files} />}
+                  <span className="text-xs font-mono text-app-secondary tracking-wide shrink-0">
+                    {album.name}
+                  </span>
+                  <div className="flex-1 h-px bg-app-border" />
+                  <span className="text-xs font-mono text-app-muted tabular-nums shrink-0">
+                    {album.files.length}
+                  </span>
                 </div>
-              )
-            })}
-          </div>
-        ))}
-      </div>
+
+                {!isAlbumCollapsed && <TrackList files={album.files} />}
+              </div>
+            )
+          })}
+        </div>
+      ))}
     </div>
   )
 }

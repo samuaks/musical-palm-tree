@@ -2,7 +2,8 @@ import { Music, Video } from 'lucide-react'
 import { MediaFile } from '../types'
 import { isVideo } from '../constants'
 import { PlayingIndicator } from './PlayingIndicator'
-import { useAppStore } from '../store'
+import { selectCurrentTrack, useAppStore } from '../store'
+import { useLocalFlatTracks } from '../hooks/useLocalFlatTracks'
 
 interface TrackProps {
   file: MediaFile
@@ -52,11 +53,14 @@ function formatRelative(ms: number): string {
 }
 
 export function Track({ file, index }: TrackProps) {
-  const currentTrack = useAppStore((s) => s.currentTrack)
-  const setCurrentTrack = useAppStore((s) => s.setCurrentTrack)
+  const currentTrack = useAppStore(selectCurrentTrack)
+
+  const flatTracks = useLocalFlatTracks()
+  const playTrackFromlist = useAppStore((s) => s.playTrackFromList)
+
   const playing = useAppStore((s) => s.playing)
-  const query = useAppStore((s) => s.query)
-  const duration = useAppStore((s) => s.durations[file.path] ?? 0)
+  const query = useAppStore((s) => s.spaces.local.query)
+  const duration = useAppStore((s) => s.spaces.local.durations[file.path] ?? 0)
 
   const isActive = currentTrack?.path == file.path
   const isCurrentlyPlaying = isActive && playing
@@ -64,10 +68,16 @@ export function Track({ file, index }: TrackProps) {
   const isVideoFile = isVideo(file.ext)
   const displayName = file.name.replace(/\.[^/.]+$/, '')
 
+  function handleClick() {
+    const idx = flatTracks.findIndex((t) => t.path === file.path)
+    if (idx < 0) return
+    playTrackFromlist(flatTracks, idx)
+  }
+
   return (
     <div
       data-track-path={file.path}
-      onClick={() => setCurrentTrack(file)}
+      onClick={handleClick}
       className={`group flex items-center gap-4 px-6 py-2 cursor-pointer transition-colors ${
         isActive ? 'bg-app-selected' : 'hover:bg-app-hover'
       }`}

@@ -1,12 +1,12 @@
 import { useEffect, useState, useRef } from 'react'
 import { Music } from 'lucide-react'
-import { useAppStore } from '../store'
+import { selectCurrentTrack, useAppStore } from '../store'
 
 export function ScrollToActive() {
-  const currentTrack = useAppStore((s) => s.currentTrack)
-  const dirs = useAppStore((s) => s.dirs)
-  const collapsed = useAppStore((s) => s.collapsed)
-  const toggleCollapsed = useAppStore((s) => s.toggleCollapsed)
+  const currentTrack = useAppStore(selectCurrentTrack)
+  const dirs = useAppStore((s) => s.spaces.local.dirs)
+  const collapsed = useAppStore((s) => s.spaces.local.collapsed)
+  const toggleCollapsed = useAppStore((s) => s.toggleLocalCollapsed)
 
   const [offscreen, setOffscreen] = useState(false)
   const observer = useRef<IntersectionObserver | null>(null)

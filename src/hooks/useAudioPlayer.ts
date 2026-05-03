@@ -2,14 +2,18 @@ import { useState, useEffect, useRef } from 'react'
 import { convertFileSrc } from '@tauri-apps/api/core'
 import { useVolume } from './useVolume'
 import { isVideo } from '../constants'
-import { useAppStore } from '../store'
+import { useAppStore, selectCurrentTrack } from '../store'
+import { resolveStream } from '../api/online'
+
+const RETRY_COOLDOWN_MS = 10_000
 
 export function useAudioPlayer(
   videoRef: React.RefObject<HTMLVideoElement | null>,
   onEnded?: () => void
 ) {
-  const track = useAppStore((s) => s.currentTrack)
+  const track = useAppStore(selectCurrentTrack)
   const setStorePlaying = useAppStore((s) => s.setPlaying)
+  const setResolving = useAppStore((s) => s.setResolving)
 
   const audioRef = useRef<HTMLAudioElement>(new Audio())
   const [playing, setPlaying] = useState(false)
@@ -17,9 +21,9 @@ export function useAudioPlayer(
   const [currentTime, setCurrentTime] = useState(0)
   const [convertedSrc, setConvertedSrc] = useState<string>('')
 
-  const { volume, changeVolume, toggleMute } = useVolume()
+  const lastRetryAt = useRef<number>(0)
 
-  //useAudioNormalization(audioRef)
+  const { volume, changeVolume, toggleMute } = useVolume()
 
   const trackIsVideo = track ? isVideo(track.ext) : false
 
@@ -35,26 +39,99 @@ export function useAudioPlayer(
   useEffect(() => {
     if (!track) return
 
-    // pause both elements before switching
     audioRef.current.pause()
     if (videoRef.current) videoRef.current.pause()
 
-    const src = convertFileSrc(track.path)
-    setConvertedSrc(src)
-    const media = getMedia()
-    media.src = src
-    media.load()
     setCurrentTime(0)
     setDuration(0)
     setPlaying(false)
+    setResolving(false)
+    lastRetryAt.current = 0 // reset cooldown when track changes
 
-    const playPromise = media.play()
-    if (playPromise) {
-      playPromise
-        .then(() => setPlaying(true))
-        .catch((e) => {
-          if (e.name !== 'AbortError') console.error(e)
-        })
+    let cancelled = false
+
+    ;(async () => {
+      let src: string
+      if (track.source === 'local') {
+        src = convertFileSrc(track.path)
+      } else {
+        setResolving(true)
+        try {
+          src = await resolveStream(track.videoId)
+        } catch (e) {
+          console.error('failed to resolve stream:', e)
+          if (!cancelled) setResolving(false)
+          return
+        }
+        if (cancelled) return
+        setResolving(false)
+      }
+
+      if (cancelled) return
+
+      setConvertedSrc(src)
+      const media = getMedia()
+      media.src = src
+      media.load()
+
+      const playPromise = media.play()
+      if (playPromise) {
+        playPromise
+          .then(() => {
+            if (!cancelled) setPlaying(true)
+          })
+          .catch((e) => {
+            if (e.name !== 'AbortError') console.error(e)
+          })
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [track])
+
+  // retry on stream URL expiry for online tracks
+  useEffect(() => {
+    if (!track || track.source !== 'online') return
+    const videoId = track.videoId
+    const media = getMedia()
+
+    let cancelled = false
+
+    async function handleError() {
+      const now = Date.now()
+      if (now - lastRetryAt.current < RETRY_COOLDOWN_MS) return
+      lastRetryAt.current = now
+
+      const resumeAt = media.currentTime
+      const wasPlaying = !media.paused
+
+      setResolving(true)
+
+      try {
+        const fresh = await resolveStream(videoId)
+        if (cancelled) return // track changed during retry — abort
+        setConvertedSrc(fresh)
+        media.src = fresh
+        media.load()
+        media.currentTime = resumeAt
+        if (wasPlaying) {
+          await media.play().catch((e) => {
+            if (e.name !== 'AbortError') console.error('play after retry failed:', e)
+          })
+        }
+      } catch (e) {
+        if (!cancelled) console.error('retry resolve failed:', e)
+      } finally {
+        if (!cancelled) setResolving(false)
+      }
+    }
+
+    media.addEventListener('error', handleError)
+    return () => {
+      cancelled = true
+      media.removeEventListener('error', handleError)
     }
   }, [track])
 

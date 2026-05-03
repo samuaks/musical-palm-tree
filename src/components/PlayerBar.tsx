@@ -1,13 +1,22 @@
 import { useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, Maximize } from 'lucide-react'
+import {
+  Play,
+  Pause,
+  SkipBack,
+  SkipForward,
+  Volume2,
+  VolumeX,
+  Maximize,
+  Loader2,
+} from 'lucide-react'
 import { useAudioPlayer } from '../hooks/useAudioPlayer'
 import { useWaveform } from '../hooks/useWaveform'
 import { useResizable } from '../hooks/useResizable'
 import { Waveform } from './Waveform'
 import { isVideo } from '../constants'
 import { usePlayer } from '../hooks/usePlayer'
-import { useAppStore } from '../store'
+import { selectCurrentTrack, useAppStore } from '../store'
 import { useFullscreen } from '../hooks/useFullscreen'
 
 const MIN_HEIGHT = 160
@@ -19,7 +28,8 @@ function formatTime(s: number) {
 }
 
 export function PlayerBar() {
-  const track = useAppStore((s) => s.currentTrack)
+  const track = useAppStore(selectCurrentTrack)
+  const resolving = useAppStore((s) => s.resolving)
   const { next, prev } = usePlayer()
   const { size: height, startDrag } = useResizable({
     defaultSize: MIN_HEIGHT,
@@ -38,8 +48,8 @@ export function PlayerBar() {
   const trackIsVideo = track ? isVideo(track.ext) : false
 
   useEffect(() => {
-    if (!track) return
-    generateWaveform(track.path)
+    const path = track?.source === 'local' ? track.path : null
+    generateWaveform(path)
   }, [track])
 
   return (
@@ -86,9 +96,10 @@ export function PlayerBar() {
 
             <button
               onClick={toggle}
+              disabled={resolving}
               className="w-10 h-10 rounded-full bg-app-accent text-app-bg flex items-center justify-center hover:scale-105 transition-transform"
             >
-              {playing ? <Pause size={18} /> : <Play size={18} className="ml-0.5" />}
+              {resolving ? <Loader2 className="animate-spin" /> : playing ? <Pause /> : <Play />}
             </button>
 
             <button

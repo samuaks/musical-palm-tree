@@ -11,26 +11,27 @@ export function useScan() {
     if (hasScanned.current) return
     hasScanned.current = true
 
-    const { setDirs, setScanMeta, setScanState, setLiveCount } = useAppStore.getState()
+    const { setLocalDirs, setLocalScanMeta, setLocalScanState, setLocalLiveCount } =
+      useAppStore.getState()
 
-    setScanState('scanning')
+    setLocalScanState('scanning')
 
     let unlistenProgress: (() => void) | undefined
     let unlistenCount: (() => void) | undefined
 
     async function setup() {
-      unlistenProgress = await listen<Directory[]>('scan_progress', event => {
-        setDirs(event.payload)
+      unlistenProgress = await listen<Directory[]>('scan_progress', (event) => {
+        setLocalDirs(event.payload)
       })
 
-      unlistenCount = await listen<number>('scan_count', event => {
-        setLiveCount(event.payload)
+      unlistenCount = await listen<number>('scan_count', (event) => {
+        setLocalLiveCount(event.payload)
       })
 
       const r = await invoke<ScanResult>('scan_media')
-      setDirs(r.directories)
-      setScanMeta(r.metadata)
-      setScanState('done')
+      setLocalDirs(r.directories)
+      setLocalScanMeta(r.metadata)
+      setLocalScanState('done')
     }
 
     setup()

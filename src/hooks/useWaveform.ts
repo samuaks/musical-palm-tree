@@ -5,8 +5,12 @@ export function useWaveform() {
   const [waveformData, setWaveformData] = useState<number[]>([])
   const [loading, setLoading] = useState(false)
 
-  async function generateWaveform(path: string): Promise<void> {
+  async function generateWaveform(path: string | null): Promise<void> {
     setWaveformData([])
+    if (!path) {
+      setLoading(false)
+      return
+    }
     setLoading(true)
     try {
       const result = await invoke<{ samples: number[] }>('generate_waveform', { path })
