@@ -56,3 +56,12 @@ export interface ScanResult {
 }
 
 export type ScanState = 'idle' | 'scanning' | 'done'
+export type OnlineSearchState = 'idle' | 'searching' | 'done' | 'error'
+
+export interface OnlineSearchResult {
+  video_id: string
+  title: string
+  duration_secs: number
+  thumbnail: string | null
+  uploader: string | null
+}

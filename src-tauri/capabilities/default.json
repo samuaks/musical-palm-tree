@@ -9,6 +9,16 @@
     "core:window:allow-maximize",
     "core:window:allow-toggle-maximize",
     "core:window:allow-close",
-    "core:window:allow-start-dragging"
+    "core:window:allow-start-dragging",
+    {
+      "identifier": "shell:allow-execute",
+      "allow": [
+        {
+          "name": "binaries/yt-dlp",
+          "sidecar": true,
+          "args": true
+        }
+      ]
+    }
   ]
 }

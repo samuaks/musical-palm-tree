@@ -28,3 +28,4 @@ md5 = "0.7"
 symphonia = { version = "0.5", features = ["mp3", "aac", "flac", "ogg", "wav", "isomp4"] }
 rayon = "1"
 lofty = "0.21"
+tauri-plugin-shell = "2"

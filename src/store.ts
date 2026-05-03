@@ -1,5 +1,12 @@
 import { create } from 'zustand'
-import { Directory, MediaFile, ScanMetaData, ScanState } from './types'
+import {
+  Directory,
+  ScanMetaData,
+  ScanState,
+  Track,
+  OnlineSearchResult,
+  OnlineSearchState,
+} from './types'
 
 type Theme = 'dark' | 'light'
 
@@ -16,8 +23,15 @@ interface LocalSpaceState {
   query: string
   durations: Record<string, number>
 
-  //collapsed albums
+  // collapsed albums
   collapsed: Set<string>
+}
+
+interface OnlineSpaceState {
+  query: string
+  results: OnlineSearchResult[]
+  searchState: OnlineSearchState
+  searchError: string | null
 }
 
 interface AppState {
@@ -25,22 +39,31 @@ interface AppState {
 
   spaces: {
     local: LocalSpaceState
+    online: OnlineSpaceState
   }
 
-  // playback state
-  currentTrack: MediaFile | null
+  // playback state (queue is the single source of truth)
+  queue: Track[]
+  queueIndex: number // -1 when nothing has been played yet
   playing: boolean
+  resolving: boolean
 
   // theme
   theme: Theme
 
   // actions
   setActiveSpaceId: (id: string) => void
-  setCurrentTrack: (track: MediaFile | null) => void
   setPlaying: (playing: boolean) => void
+  setResolving: (resolving: boolean) => void
   setTheme: (theme: Theme) => void
 
-  //local space actions
+  // queue actions
+  playTrackFromList: (tracks: Track[], index: number) => void
+  playNext: () => void
+  playPrev: () => void
+  clearQueue: () => void
+
+  // local space actions
   setLocalDirs: (dirs: Directory[]) => void
   setLocalScanMeta: (meta: ScanMetaData | null) => void
   setLocalScanState: (state: ScanState) => void
@@ -48,12 +71,21 @@ interface AppState {
   setLocalQuery: (query: string) => void
   setLocalDuration: (path: string, duration: number) => void
   toggleLocalCollapsed: (key: string) => void
+
+  // online space actions
+  setOnlineQuery: (query: string) => void
+  setOnlineResults: (results: OnlineSearchResult[]) => void
+  setOnlineSearchState: (state: OnlineSearchState) => void
+  setOnlineSearchError: (error: string | null) => void
+  resetOnlineSearch: () => void
 }
 
 export const useAppStore = create<AppState>((set) => ({
   activeSpaceId: 'local',
-  currentTrack: null,
+  queue: [],
+  queueIndex: -1,
   playing: false,
+  resolving: false,
   theme:
     (typeof window !== 'undefined' && (localStorage.getItem('playmusic-theme') as Theme)) || 'dark',
 
@@ -67,16 +99,40 @@ export const useAppStore = create<AppState>((set) => ({
       durations: {},
       collapsed: loadCollapsed(),
     },
+    online: {
+      query: '',
+      results: [],
+      searchState: 'idle',
+      searchError: null,
+    },
   },
 
   setActiveSpaceId: (id) => set({ activeSpaceId: id }),
-  setCurrentTrack: (currentTrack) => set({ currentTrack }),
   setPlaying: (playing) => set({ playing }),
+  setResolving: (resolving) => set({ resolving }),
   setTheme: (theme) => {
     localStorage.setItem('playmusic-theme', theme)
     document.documentElement.dataset.theme = theme
     set({ theme })
   },
+  playTrackFromList: (tracks, index) => {
+    if (tracks.length === 0 || index < 0 || index >= tracks.length) return
+    set({ queue: tracks, queueIndex: index })
+  },
+
+  playNext: () =>
+    set((s) => {
+      if (s.queueIndex < 0 || s.queueIndex >= s.queue.length - 1) return s
+      return { queueIndex: s.queueIndex + 1 }
+    }),
+
+  playPrev: () =>
+    set((s) => {
+      if (s.queueIndex <= 0) return s
+      return { queueIndex: s.queueIndex - 1 }
+    }),
+
+  clearQueue: () => set({ queue: [], queueIndex: -1 }),
 
   setLocalDirs: (dirs) =>
     set((s) => ({ spaces: { ...s.spaces, local: { ...s.spaces.local, dirs } } })),
@@ -108,6 +164,28 @@ export const useAppStore = create<AppState>((set) => ({
         spaces: { ...s.spaces, local: { ...s.spaces.local, collapsed: next } },
       }
     }),
+
+  setOnlineQuery: (query) =>
+    set((s) => ({ spaces: { ...s.spaces, online: { ...s.spaces.online, query } } })),
+  setOnlineResults: (results) =>
+    set((s) => ({ spaces: { ...s.spaces, online: { ...s.spaces.online, results } } })),
+  setOnlineSearchState: (searchState) =>
+    set((s) => ({ spaces: { ...s.spaces, online: { ...s.spaces.online, searchState } } })),
+  setOnlineSearchError: (searchError) =>
+    set((s) => ({ spaces: { ...s.spaces, online: { ...s.spaces.online, searchError } } })),
+  resetOnlineSearch: () =>
+    set((s) => ({
+      spaces: {
+        ...s.spaces,
+        online: {
+          ...s.spaces.online,
+          query: '',
+          results: [],
+          searchState: 'idle',
+          searchError: null,
+        },
+      },
+    })),
 }))
 
 function loadCollapsed(): Set<string> {
@@ -125,4 +203,9 @@ function loadCollapsed(): Set<string> {
 if (typeof window !== 'undefined') {
   const initial = (localStorage.getItem('playmusic-theme') as Theme) || 'dark'
   document.documentElement.dataset.theme = initial
+}
+
+export const selectCurrentTrack = (s: ReturnType<typeof useAppStore.getState>): Track | null => {
+  if (s.queueIndex < 0 || s.queueIndex >= s.queue.length) return null
+  return s.queue[s.queueIndex]
 }
