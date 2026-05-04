@@ -11,6 +11,7 @@ import {
 type Theme = 'dark' | 'light'
 
 const COLLAPSED_KEY = 'playmusic-collapsed'
+const ACTIVE_SPACE_KEY = 'playmusic-active-space'
 
 interface LocalSpaceState {
   // scan state
@@ -81,7 +82,7 @@ interface AppState {
 }
 
 export const useAppStore = create<AppState>((set) => ({
-  activeSpaceId: 'local',
+  activeSpaceId: loadActiveSpaceId(),
   queue: [],
   queueIndex: -1,
   playing: false,
@@ -107,7 +108,18 @@ export const useAppStore = create<AppState>((set) => ({
     },
   },
 
-  setActiveSpaceId: (id) => set({ activeSpaceId: id }),
+  setActiveSpaceId: (id) =>
+    set((s) => {
+      if (s.activeSpaceId === id) return s
+      localStorage.setItem(ACTIVE_SPACE_KEY, id)
+      return {
+        activeSpaceId: id,
+        queue: [],
+        queueIndex: -1,
+        playing: false,
+        resolving: false,
+      }
+    }),
   setPlaying: (playing) => set({ playing }),
   setResolving: (resolving) => set({ resolving }),
   setTheme: (theme) => {
@@ -208,4 +220,9 @@ if (typeof window !== 'undefined') {
 export const selectCurrentTrack = (s: ReturnType<typeof useAppStore.getState>): Track | null => {
   if (s.queueIndex < 0 || s.queueIndex >= s.queue.length) return null
   return s.queue[s.queueIndex]
+}
+
+function loadActiveSpaceId(): string {
+  if (typeof window === 'undefined') return 'online'
+  return localStorage.getItem(ACTIVE_SPACE_KEY) || 'online'
 }

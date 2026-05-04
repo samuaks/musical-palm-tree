@@ -37,15 +37,23 @@ export function useAudioPlayer(
   }, [playing])
 
   useEffect(() => {
-    if (!track) return
-
     audioRef.current.pause()
     if (videoRef.current) videoRef.current.pause()
 
-    setCurrentTime(0)
-    setDuration(0)
-    setPlaying(false)
-    setResolving(false)
+    if (!track) {
+      audioRef.current.removeAttribute('src')
+      audioRef.current.load()
+      if (videoRef.current) {
+        videoRef.current.removeAttribute('src')
+        videoRef.current.load()
+      }
+      setConvertedSrc('')
+      setCurrentTime(0)
+      setDuration(0)
+      setPlaying(false)
+      setResolving(false)
+      return
+    }
     lastRetryAt.current = 0 // reset cooldown when track changes
 
     let cancelled = false
@@ -210,6 +218,7 @@ export function useAudioPlayer(
   }, [playing, currentTime, duration, volume])
 
   function toggle() {
+    if (!track) return
     const media = getMedia()
     if (playing) {
       media.pause()
@@ -226,6 +235,7 @@ export function useAudioPlayer(
   }
 
   function seek(time: number) {
+    if (!track) return
     const media = getMedia()
     media.currentTime = time
     setCurrentTime(time)

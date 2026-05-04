@@ -9,11 +9,16 @@ export function useScan() {
 
   useEffect(() => {
     if (hasScanned.current) return
-    hasScanned.current = true
 
-    const { setLocalDirs, setLocalScanMeta, setLocalScanState, setLocalLiveCount } =
+    const { setLocalDirs, setLocalScanMeta, setLocalScanState, setLocalLiveCount, spaces } =
       useAppStore.getState()
 
+    if (spaces.local.dirs.length > 0) {
+      hasScanned.current = true
+      return
+    }
+
+    hasScanned.current = true
     setLocalScanState('scanning')
 
     let unlistenProgress: (() => void) | undefined
