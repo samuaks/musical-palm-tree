@@ -1,17 +1,17 @@
-# musical-palm-tree
+# PlayMusic Desktop
 
 A cross-platform desktop media player built with Tauri, React, and Rust, and a companion project in the PlayMusic ecosystem. It scans your home directory for audio and video files, groups them by folder, and plays them with a keyboard-driven waveform UI inspired by terminal aesthetics.
 
 ## Relationship to PlayMusic
 
-`musical-palm-tree` is a desktop companion project in the PlayMusic ecosystem.
+PlayMusic Desktop is a desktop companion project in the PlayMusic ecosystem. The repository is currently named `musical-palm-tree`.
 
 The main [PlayMusic](https://github.com/samuaks/playmusic) repository focuses on a Go/Bubble Tea terminal media player. This project explores the same media-player domain through a desktop stack: Tauri, React, TypeScript, and Rust.
 
 Together, the projects offer complementary learning paths:
 
 - PlayMusic: Go, terminal UI, playback architecture, CLI/TUI workflows
-- musical-palm-tree: desktop UX, React state, Tauri IPC, Rust-backed media processing
+- PlayMusic Desktop: desktop UX, React state, Tauri IPC, Rust-backed media processing
 
 This repository is especially fork-friendly: contributors can experiment with UI, playback, scanning, and desktop interaction ideas in their own forks, then bring small, well-explained improvements back through pull requests.
 

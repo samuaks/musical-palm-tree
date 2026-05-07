@@ -2,15 +2,16 @@
 
 ## Scope
 
-This document describes `musical-palm-tree`, the Tauri desktop companion project
-in the PlayMusic ecosystem. The main PlayMusic repository focuses on a
+This document describes PlayMusic Desktop, the Tauri desktop companion project
+in the PlayMusic ecosystem. The repository is currently named `musical-palm-tree`.
+The main PlayMusic repository focuses on a
 Go/Bubble Tea terminal player; this repository explores the same media-player
 domain through a desktop UI, React state, Tauri IPC, and Rust-backed media work.
 
 The two projects share learning-oriented open-source goals and media-player
 ideas, while using different stacks and interaction models.
 
-| Area | PlayMusic | musical-palm-tree |
+| Area | PlayMusic | PlayMusic Desktop |
 | --- | --- | --- |
 | Interface | Bubble Tea TUI | Desktop WebView UI |
 | Main stack | Go | Tauri, React, TypeScript, Rust |
@@ -20,7 +21,7 @@ ideas, while using different stacks and interaction models.
 
 ## Overview
 
-`musical-palm-tree` is a Tauri 2 desktop app with a React frontend and Rust backend.
+PlayMusic Desktop is a Tauri 2 desktop app with a React frontend and Rust backend.
 The app is structured around the concept of "spaces" — distinct music sources
 (local filesystem, online streaming, etc.) that share common playback
 infrastructure.
