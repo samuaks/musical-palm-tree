@@ -162,3 +162,10 @@ When bringing work back, prefer small pull requests with a clear explanation, sc
 The browser's `AudioContext.decodeAudioData` loads the full file into memory as raw PCM before any processing can begin. A 38-minute stereo track decodes to roughly 800MB of floats, which crashes the WebView process on large files.
 
 Moving waveform generation to Rust with `symphonia` bounded memory usage to the decoded portion (first 60s) regardless of file size, while also producing cleaner output via native format parsers.
+
+## Releases
+Github action to create artifacts for different platforms
+Again for new release
+
+## Branch purpose
+> this branch is only for releases, no real work should be done here
