@@ -1,11 +1,57 @@
 # Architecture
 
+## Scope
+
+This document describes `musical-palm-tree`, the Tauri desktop companion project
+in the PlayMusic ecosystem. The main PlayMusic repository focuses on a
+Go/Bubble Tea terminal player; this repository explores the same media-player
+domain through a desktop UI, React state, Tauri IPC, and Rust-backed media work.
+
+The two projects share learning-oriented open-source goals and media-player
+ideas, while using different stacks and interaction models.
+
+| Area | PlayMusic | musical-palm-tree |
+| --- | --- | --- |
+| Interface | Bubble Tea TUI | Desktop WebView UI |
+| Main stack | Go | Tauri, React, TypeScript, Rust |
+| Learning focus | Go packages, TUI, playback | React state, desktop UX, IPC, Rust commands |
+| Video path | External player handoff | Embedded video pane |
+| Contribution style | Focused PRs | Fork-friendly experiments + focused PRs |
+
 ## Overview
 
-PlayMusic is a Tauri 2 desktop app with a React frontend and Rust backend.
+`musical-palm-tree` is a Tauri 2 desktop app with a React frontend and Rust backend.
 The app is structured around the concept of "spaces" — distinct music sources
 (local filesystem, online streaming, etc.) that share common playback
 infrastructure.
+
+## How To Read This Project
+
+If you are new to this codebase, start with:
+
+1. `src/App.tsx` - top-level layout and persistent player shell
+2. `src/spaces/index.tsx` - registered content spaces
+3. `src/spaces/LocalSpace.tsx` - local media library flow
+4. `src/spaces/OnlineSpace.tsx` - online search results flow
+5. `src/components/PlayerBar.tsx` - playback controls, waveform, and media elements
+6. `src/store.ts` - global Zustand state and queue model
+7. `src-tauri/src/lib.rs` - registered Rust commands
+8. `src-tauri/src/scanner.rs` - local filesystem scanning
+9. `src-tauri/src/waveform.rs` - waveform generation
+
+The main mental model is: React owns UI and state, Tauri IPC connects it to
+Rust, and Rust handles heavier filesystem and media work.
+
+## Main User Flow
+
+1. The app opens with a desktop shell: titlebar, header, sidebar, active space,
+   video pane, and player bar.
+2. The active space renders either local media or online search.
+3. Local media is scanned through the Rust `scan_media` command.
+4. Scan progress streams back to React via Tauri events.
+5. Selecting a track updates the global queue in Zustand.
+6. `PlayerBar` owns playback controls, waveform display, and audio/video
+   elements.
 
 ## Tech Stack
 
