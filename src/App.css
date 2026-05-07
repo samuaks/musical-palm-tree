@@ -1,4 +1,128 @@
-@import "tailwindcss";
+@import 'tailwindcss';
+
+@theme {
+  /* surfaces — semi-transparent so gradient bleeds through */
+  --color-app-bg: rgba(15, 25, 45, 0.6);
+  --color-app-surface: rgba(10, 20, 35, 0.7);
+
+  /* hover/selected — cool blue-tinted overlays */
+  --color-app-hover: rgba(255, 255, 255, 0.06);
+  --color-app-selected: rgba(255, 255, 255, 0.1);
+
+  /* text — cool whites with slight blue */
+  --color-app-text: #e2e8f0;
+  --color-app-secondary: #94a3b8;
+  --color-app-muted: #64748b;
+
+  /* accent — pick one that pops against the blue twilight */
+  --color-app-accent-text: #1a1a1a;
+  /* warm amber/gold pairs nicely with cool twilight */
+  --color-app-accent: #fbbf24; /* amber-400 — like a warm light */
+  --color-app-accent-played: #f59e0b; /* amber-500 */
+  --color-app-accent-rewind: #b45309; /* amber-700 */
+  --color-app-accent-dim: rgba(251, 191, 36, 0.3);
+
+  /* borders — subtle blue-gray */
+  --color-app-border: rgba(255, 255, 255, 0.1);
+  --color-app-skeleton: rgba(255, 255, 255, 0.1);
+  --color-app-waveform: #475569;
+}
+[data-theme='light'] {
+  /* surfaces — almost pure white */
+  --color-app-bg: rgba(255, 255, 255, 0.85);
+  --color-app-surface: rgba(255, 255, 255, 0.95);
+
+  /* hover/selected — gentle red wash */
+  --color-app-hover: rgba(0, 0, 0, 0.1);
+  --color-app-selected: rgba(220, 38, 38, 0.15); /* was 0.08 */
+
+  /* text — clean and dark for readability */
+  --color-app-text: #0a0a0a;
+  --color-app-secondary: #404040;
+  --color-app-muted: #737373;
+
+  --color-app-accent-text: #ffffff;
+  /* the iconic red accent */
+  --color-app-accent: #dc2626; /* red-600 — Mirror's Edge red */
+  --color-app-accent-played: #b91c1c; /* red-700 */
+  --color-app-accent-rewind: #991b1b; /* red-800 */
+  --color-app-accent-dim: rgba(220, 38, 38, 0.3);
+
+  /* clean borders */
+  --color-app-border: rgba(0, 0, 0, 0.08);
+  --color-app-skeleton: rgba(0, 0, 0, 0.05);
+  --color-app-waveform: #d4d4d4;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+button {
+  cursor: pointer;
+}
+
+body {
+  background: linear-gradient(
+    180deg,
+    #0a1830 0%,
+    #1a3050 25%,
+    #2a4570 45%,
+    #1f2a45 75%,
+    #0d1525 100% /* very deep at bottom */
+  );
+  position: relative;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: -1;
+  background-image:
+    radial-gradient(1px 1px at 20% 8%, #fff5b8 50%, transparent),
+    radial-gradient(1px 1px at 60% 12%, #ffe88a 50%, transparent),
+    radial-gradient(1px 1px at 35% 18%, #fff5b8 50%, transparent),
+    radial-gradient(1px 1px at 80% 6%, #ffe88a 50%, transparent),
+    radial-gradient(1px 1px at 50% 22%, #fff5b8 50%, transparent),
+    radial-gradient(1px 1px at 15% 28%, #ffe88a 50%, transparent),
+    radial-gradient(1px 1px at 75% 25%, #fff5b8 50%, transparent),
+    radial-gradient(1px 1px at 40% 35%, #ffe88a 50%, transparent),
+    radial-gradient(1px 1px at 90% 32%, #fff5b8 50%, transparent),
+    radial-gradient(2px 2px at 25% 15%, #ffeb99 50%, transparent),
+    radial-gradient(2px 2px at 65% 28%, #fff8c4 50%, transparent);
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  animation: twinkle 4s ease-in-out infinite alternate;
+}
+@keyframes twinkle {
+  0%,
+  100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+[data-theme='light'] body {
+  background: linear-gradient(180deg, #ffffff 0%, #fafbfc 50%, #f5f7fa 100%);
+}
+/* 
+  Subtle warm: background: linear-gradient(180deg, #1a1a1a 0%, #2a1f24 100%);
+  Cooler, blue purple: background: linear-gradient(180deg, #0f0f1a 0%, #1a1a2e 100%);
+  Dark teal vibe matching app accent:
+  background: linear-gradient(180deg, #0a1414 0%, #1a2526 100%);
+  background: linear-gradient(180deg, #0d0d0d 0%, #1a1a1a 50%, #2a1f24 100%);
+  background: linear-gradient(135deg, #1a1a1a 0%, #2a1a24 50%, #1a1a2e 100%);
+  background: radial-gradient(ellipse at top, #2a2a2a 0%, #0d0d0d 70%);
+  background: radial-gradient(ellipse at top, #2a2a2a 0%, #0d0d0d 70%);
+  background: radial-gradient(ellipse at center, #1f1f1f 0%, #0d0d0d 100%);
+
+*/
 
 ::-webkit-scrollbar {
   width: 4px;
@@ -9,6 +133,56 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #334155;
+  background: var(--color-app-border);
   border-radius: 2px;
+}
+@keyframes eq {
+  0%,
+  100% {
+    height: 30%;
+  }
+  50% {
+    height: 100%;
+  }
+}
+
+.animate-eq {
+  animation: eq 0.8s ease-in-out infinite;
+}
+input[type='range'] {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+  height: 4px;
+}
+
+input[type='range']::-webkit-slider-runnable-track {
+  background: var(--color-app-border);
+  border-radius: 2px;
+  height: 4px;
+}
+
+input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  background: var(--color-app-accent);
+  border-radius: 50%;
+  height: 12px;
+  width: 12px;
+  margin-top: -4px;
+}
+
+input[type='range']::-moz-range-track {
+  background: var(--color-app-border);
+  border-radius: 2px;
+  height: 4px;
+}
+
+input[type='range']::-moz-range-thumb {
+  background: var(--color-app-accent);
+  border-radius: 50%;
+  height: 12px;
+  width: 12px;
+  border: none;
 }

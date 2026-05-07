@@ -1,23 +1,19 @@
-interface HeaderProps {
-  query: string
-  onSearch: (q: string) => void
-}
+import { useAppStore } from '../store'
+import { SPACES } from '../spaces'
+import { ThemeToggle } from './ThemeToggle'
 
-export function Header({ query, onSearch }: HeaderProps) {
+export function Header() {
+  const activeSpaceId = useAppStore((s) => s.activeSpaceId)
+  const space = SPACES.find((s) => s.id === activeSpaceId)
+  const SpaceHeader = space?.Header
+
   return (
-    <div className="shrink-0 px-4 pt-4 pb-3 border-b border-slate-700">
-      <span className="text-teal-400 font-bold tracking-wide text-sm">
-        PlayMusic
-      </span>
-      <div className="flex items-center gap-2 mt-3">
-        <span className="text-teal-400 text-sm">{'>'}</span>
-        <input
-          type="text"
-          value={query}
-          onChange={e => onSearch(e.target.value)}
-          placeholder="type to search..."
-          className="bg-transparent text-slate-300 text-sm font-mono placeholder-slate-600 outline-none w-full"
-        />
+    <div className="shrink-0 px-6 pt-5 pb-4 border-b border-app-border">
+      <div className="flex items-start gap-4">
+        <div className="flex-1 min-w-0">{SpaceHeader && <SpaceHeader />}</div>
+        <div className="shrink-0 pt-0.5">
+          <ThemeToggle />
+        </div>
       </div>
     </div>
   )

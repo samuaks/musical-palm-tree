@@ -1,16 +1,25 @@
-import { useEffect, useRef, useState } from 'react'
-import { MediaFile } from '../types'
-import { Music, Video, ChevronUp, ChevronDown, Play, Pause, SkipBack, SkipForward, VolumeX, Volume1, Volume2 } from 'lucide-react'
+import { useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
+import {
+  Play,
+  Pause,
+  SkipBack,
+  SkipForward,
+  Volume2,
+  VolumeX,
+  Maximize,
+  Loader2,
+} from 'lucide-react'
 import { useAudioPlayer } from '../hooks/useAudioPlayer'
+import { useWaveform } from '../hooks/useWaveform'
+import { useResizable } from '../hooks/useResizable'
+import { Waveform } from './Waveform'
+import { isVideo } from '../constants'
+import { usePlayer } from '../hooks/usePlayer'
+import { selectCurrentTrack, useAppStore } from '../store'
+import { useFullscreen } from '../hooks/useFullscreen'
 
-
-interface PlayerBarProps {
-  track: MediaFile | null
-  onNext?: () => void
-  onPrev?: () => void
-}
-
-const videoExts = ['mp4', 'mkv', 'webm', 'avi', 'mov']
+const MIN_HEIGHT = 160
 
 function formatTime(s: number) {
   const m = Math.floor(s / 60)
@@ -18,112 +27,141 @@ function formatTime(s: number) {
   return `${m}:${sec.toString().padStart(2, '0')}`
 }
 
+export function PlayerBar() {
+  const track = useAppStore(selectCurrentTrack)
+  const resolving = useAppStore((s) => s.resolving)
+  const { next, prev } = usePlayer()
+  const { size: height, startDrag } = useResizable({
+    defaultSize: MIN_HEIGHT,
+    axis: 'vertical',
+    storageKey: 'playmusic-playerbar-height',
+  })
 
-export function PlayerBar({ track, onNext, onPrev }: PlayerBarProps) {
-  const [expanded, setExpanded] = useState(false)
-  const isVideo = track ? videoExts.includes(track.ext.toLowerCase()) : false
-
-  const audioRef = useRef<HTMLAudioElement>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
-  const mediaRef = (isVideo ? videoRef : audioRef) as React.RefObject<HTMLVideoElement | HTMLAudioElement>
+  const { toggle: toggleFullscreen } = useFullscreen(videoRef)
+  const { playing, duration, currentTime, toggle, seek, volume, changeVolume, toggleMute } =
+    useAudioPlayer(videoRef, next)
 
-  const { playing, duration, currentTime, toggle, seek, volume, changeVolume } =
-    useAudioPlayer(track, mediaRef, onNext)
-
-  useEffect(() => {
-    if (isVideo) setExpanded(true)
-  }, [track])
-
-  useEffect(() => {
-  if (isVideo) {
-    audioRef.current?.pause()
-  } else {
-    videoRef.current?.pause()
-  }
-}, [isVideo])
+  const { waveformData, generateWaveform, loading } = useWaveform()
 
   const displayName = track?.name.replace(/\.[^/.]+$/, '') ?? 'No track selected'
-  const VolumeIcon = volume === 0 ? VolumeX : volume < 0.5 ? Volume1 : Volume2
+  const trackIsVideo = track ? isVideo(track.ext) : false
+
+  useEffect(() => {
+    const path = track?.source === 'local' ? track.path : null
+    generateWaveform(path)
+  }, [track])
 
   return (
-   <div className={`shrink-0 border-t border-slate-700 transition-all duration-300 ${
-  expanded ? 'h-128' : 'h-14'
-}`}>
-      <audio ref={audioRef} />
-      <video
-        ref={videoRef}
-        className="w-full rounded bg-black"
-        style={{
-          maxHeight: '420px',
-          display: expanded && isVideo ? 'block' : 'none'
-        }}
-      />
-
-      <div className="flex items-center gap-3 px-4 h-14">
-        <div className="text-slate-500">
-          {isVideo ? <Video size={14} /> : <Music size={14} />}
-        </div>
-
-        <span className="text-slate-300 text-sm font-mono truncate flex-1">
-          {displayName}
-        </span>
-
-        <div className="flex items-center gap-3">
-          <button tabIndex={-1} onMouseDown={e => e.preventDefault()} onClick={onPrev} className="text-slate-500 hover:text-slate-300 transition-colors">
-            <SkipBack size={14} />
-          </button>
-          <button tabIndex={-1} onMouseDown={e => e.preventDefault()} onClick={toggle} className="text-teal-400 hover:text-teal-300 transition-colors">
-            {playing ? <Pause size={16} /> : <Play size={16} />}
-          </button>
-          <button tabIndex={-1} onMouseDown={e => e.preventDefault()} onClick={onNext} className="text-slate-500 hover:text-slate-300 transition-colors">
-            <SkipForward size={14} />
-          </button>
-        </div>
-
-        <span className="text-slate-500 text-xs font-mono w-20 text-right">
-          {formatTime(currentTime)} / {formatTime(duration)}
-        </span>
-
-        <div className="flex items-center gap-2 ml-2">
-          <VolumeIcon size={14} className="text-slate-500 shrink-0" />
-          <input
-            type="range"
-            min={0}
-            max={1}
-                tabIndex={-1}
-          onMouseUp={e => (e.target as HTMLInputElement).blur()}
-            step={0.01}
-            value={volume}
-            onChange={e => changeVolume(Number(e.target.value))}
-            className="w-20 accent-teal-400"
-          />
-        </div>
-
-        <button
-          tabIndex={-1}
-          onMouseDown={e => e.preventDefault()}
-          onClick={() => setExpanded(!expanded)}
-          className="text-slate-500 hover:text-slate-300 transition-colors ml-2"
-        >
-          {expanded ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
-        </button>
-      </div>
-
-      {expanded && (
-        <div className="px-4 pb-4 flex flex-col gap-3 overflow-hidden">
-          <input
-            type="range"
-            min={0}
-            tabIndex={-1}
-            max={duration}
-            onMouseUp={e => (e.target as  HTMLInputElement).blur()}
-            value={currentTime}
-            onChange={e => seek(Number(e.target.value))}
-            className="w-full accent-teal-400"
-          />
-  
-        </div>
+    <>
+      {createPortal(
+        <video
+          ref={videoRef}
+          className={`w-full h-full ${track && trackIsVideo ? 'block' : 'hidden'}`}
+          style={{ objectFit: 'contain' }}
+          onDoubleClick={toggleFullscreen}
+        />,
+        document.getElementById('video-pane') ?? document.body
       )}
-    </div>
+
+      <div
+        className="flex flex-col border-t border-app-border relative"
+        style={{ height: `${height}px` }}
+      >
+        {/* drag handle */}
+        <div
+          onMouseDown={startDrag}
+          className="absolute top-0 left-0 right-0 cursor-ns-resize z-10 group"
+          style={{ height: '12px', transform: 'translateY(-6px)' }}
+        >
+          <div className="absolute top-1/2 left-0 right-0 h-px -translate-y-1/2 group-hover:bg-app-accent-dim transition-colors" />
+        </div>
+
+        {/* top row — track info + controls */}
+        <div className="flex items-center px-6 pt-3 pb-2 gap-4">
+          <div className="flex flex-col min-w-0 flex-1">
+            <span className="text-sm font-mono text-app-accent truncate">{displayName}</span>
+            <span className="text-xs font-mono text-app-muted tabular-nums">
+              {formatTime(currentTime)} / {formatTime(duration)}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-4">
+            <button
+              onClick={prev}
+              className="text-app-secondary hover:text-app-text transition-colors"
+            >
+              <SkipBack size={16} />
+            </button>
+
+            <button
+              onClick={toggle}
+              disabled={resolving}
+              className="w-10 h-10 rounded-full bg-app-accent text-app-bg flex items-center justify-center hover:scale-105 transition-transform"
+            >
+              {resolving ? <Loader2 className="animate-spin" /> : playing ? <Pause /> : <Play />}
+            </button>
+
+            <button
+              onClick={next}
+              className="text-app-secondary hover:text-app-text transition-colors"
+            >
+              <SkipForward size={16} />
+            </button>
+          </div>
+
+          <div className="flex items-center gap-3 flex-1 justify-end">
+            <button
+              onClick={toggleMute}
+              className="text-app-muted hover:text-app-text transition-colors"
+            >
+              {volume === 0 ? <VolumeX size={14} /> : <Volume2 size={14} />}
+            </button>
+            <input
+              type="range"
+              min={0}
+              max={1}
+              step={0.01}
+              value={volume}
+              onChange={(e) => changeVolume(Number(e.target.value))}
+              onMouseUp={(e) => (e.target as HTMLInputElement).blur()}
+              className="w-24 accent-app-accent"
+            />
+          </div>
+
+          {track && trackIsVideo && (
+            <button
+              onClick={toggleFullscreen}
+              className="text-app-muted  hover:text-app-text transition-colors"
+              title="Fullscreen"
+            >
+              <Maximize size={14} />
+            </button>
+          )}
+        </div>
+
+        <div className="flex-1 px-6 pb-2 min-h-0" style={{ height: '72px' }}>
+          <Waveform
+            data={waveformData}
+            currentTime={currentTime}
+            duration={duration}
+            onSeek={seek}
+            loading={loading}
+          />
+        </div>
+
+        <div className="flex items-center gap-4 px-6 py-1.5 border-t border-app-border text-[10px] font-mono text-app-muted">
+          <span>
+            <span className="text-app-secondary">space</span> pause/resume
+          </span>
+          <span>
+            <span className="text-app-secondary">↑↓</span> volume
+          </span>
+          <span>
+            <span className="text-app-secondary">←→</span> seek
+          </span>
+        </div>
+      </div>
+    </>
   )
 }

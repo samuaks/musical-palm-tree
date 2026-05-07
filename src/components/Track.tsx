@@ -1,49 +1,119 @@
 import { Music, Video } from 'lucide-react'
 import { MediaFile } from '../types'
+import { isVideo } from '../constants'
+import { PlayingIndicator } from './PlayingIndicator'
+import { selectCurrentTrack, useAppStore } from '../store'
+import { useLocalFlatTracks } from '../hooks/useLocalFlatTracks'
 
 interface TrackProps {
   file: MediaFile
-  onPlay: (file: MediaFile) => void
-  isPlaying?: boolean
-  query: string
+  index: number
 }
-
-const videoExts = ['mp4', 'mkv', 'webm', 'avi', 'mov']
 
 function highlight(text: string, query: string) {
   if (!query) return <span>{text}</span>
   const idx = text.toLowerCase().indexOf(query.toLowerCase())
   if (idx === -1) return <span>{text}</span>
-
   return (
     <>
       <span>{text.slice(0, idx)}</span>
-      <span className="text-teal-400 underline">{text.slice(idx, idx + query.length)}</span>
+      <span className="text-app-accent">{text.slice(idx, idx + query.length)}</span>
       <span>{text.slice(idx + query.length)}</span>
     </>
   )
 }
 
-export function Track({ file, onPlay, isPlaying = false, query   }: TrackProps) {
-  const displayName = file.name.replace(/\.[^/.]+$/, '') 
-  const isVideo = videoExts.includes(file.ext.toLowerCase())
+function formatDuration(secs: number): string {
+  if (secs === 0) return '--:--'
+  const h = Math.floor(secs / 3600)
+  const m = Math.floor((secs % 3600) / 60)
+  const s = Math.floor(secs % 60)
+  if (h > 0) return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
+  return `${m}:${s.toString().padStart(2, '0')}`
+}
+
+function formatRelative(ms: number): string {
+  if (ms === 0) return ''
+  const diff = Date.now() - ms
+  const seconds = Math.floor(diff / 1000)
+  const minutes = Math.floor(seconds / 60)
+  const hours = Math.floor(minutes / 60)
+  const days = Math.floor(hours / 24)
+  const weeks = Math.floor(days / 7)
+  const months = Math.floor(days / 30)
+  const years = Math.floor(days / 365)
+
+  if (years > 0) return `${years}y ago`
+  if (months > 0) return `${months}mo ago`
+  if (weeks > 0) return `${weeks}w ago`
+  if (days > 0) return `${days}d ago`
+  if (hours > 0) return `${hours}h ago`
+  if (minutes > 0) return `${minutes}m ago`
+  return 'just now'
+}
+
+export function Track({ file, index }: TrackProps) {
+  const currentTrack = useAppStore(selectCurrentTrack)
+
+  const flatTracks = useLocalFlatTracks()
+  const playTrackFromlist = useAppStore((s) => s.playTrackFromList)
+
+  const playing = useAppStore((s) => s.playing)
+  const query = useAppStore((s) => s.spaces.local.query)
+  const duration = useAppStore((s) => s.spaces.local.durations[file.path] ?? 0)
+
+  const isActive = currentTrack?.path == file.path
+  const isCurrentlyPlaying = isActive && playing
+
+  const isVideoFile = isVideo(file.ext)
+  const displayName = file.name.replace(/\.[^/.]+$/, '')
+
+  function handleClick() {
+    const idx = flatTracks.findIndex((t) => t.path === file.path)
+    if (idx < 0) return
+    playTrackFromlist(flatTracks, idx)
+  }
 
   return (
     <div
-      onClick={() => onPlay(file)}
-      className={`flex flex-col px-6 py-2 cursor-pointer hover:bg-white/5 transition-colors ${
-        isPlaying ? 'border-l-2 border-teal-400' : 'border-l-2 border-transparent'
+      data-track-path={file.path}
+      onClick={handleClick}
+      className={`group flex items-center gap-4 px-6 py-2 cursor-pointer transition-colors ${
+        isActive ? 'bg-app-selected' : 'hover:bg-app-hover'
       }`}
     >
-    
-      <span className={`text-sm font-mono ${isPlaying ? 'text-teal-400' : 'text-slate-300'}`}>
+      {/* index or playing indicator */}
+      <div className="w-8 flex items-center justify-end shrink-0">
+        {isActive ? (
+          <PlayingIndicator playing={isCurrentlyPlaying} />
+        ) : (
+          <span className="text-xs font-mono text-app-secondary tabular-nums">
+            {String(index + 1).padStart(2, '0')}
+          </span>
+        )}
+      </div>
+
+      {/* type icon */}
+      <div className={isCurrentlyPlaying ? 'text-app-accent' : 'text-app-secondary'}>
+        {isVideoFile ? <Video size={16} /> : <Music size={16} />}
+      </div>
+
+      {/* track name */}
+      <span
+        className={`text-sm font-mono flex-1 truncate min-w-0 ${
+          isActive ? 'text-app-accent' : 'text-app-text'
+        }`}
+      >
         {highlight(displayName, query)}
       </span>
-        <div className="text-slate-500">
-        {isVideo ? <Video size={14} />:  <Music size={14} />}
-      </div>
-      <span className="text-xs font-mono text-slate-500">
-        {/*isPlaying ? '▶ ' : ''}{file.ext.toUpperCase()*/}
+
+      <span className="text-sm font-mono text-app-secondary tabular-nums shrink-0 w-16 text-right">
+        {formatRelative(file.created_at)}
+      </span>
+
+      {/* duration */}
+      <span className="text-sm font-mono text-app-secondary tabular-nums text-right w-12 shrink-0">
+        {formatDuration(duration)}
       </span>
     </div>
   )
