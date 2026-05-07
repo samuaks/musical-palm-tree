@@ -1,6 +1,19 @@
-# PlayMusic
+# PlayMusic Desktop
 
-A cross-platform media player built with Tauri, React, and Rust. Scans your home directory for audio and video files, groups them by folder, and plays them with a keyboard-driven waveform UI inspired by terminal aesthetics.
+A cross-platform desktop media player built with Tauri, React, and Rust, and a companion project in the PlayMusic ecosystem. It scans your home directory for audio and video files, groups them by folder, and plays them with a keyboard-driven waveform UI inspired by terminal aesthetics.
+
+## Relationship to PlayMusic
+
+PlayMusic Desktop is a desktop companion project in the PlayMusic ecosystem. The repository is currently named `musical-palm-tree`.
+
+The main [PlayMusic](https://github.com/samuaks/playmusic) repository focuses on a Go/Bubble Tea terminal media player. This project explores the same media-player domain through a desktop stack: Tauri, React, TypeScript, and Rust.
+
+Together, the projects offer complementary learning paths:
+
+- PlayMusic: Go, terminal UI, playback architecture, CLI/TUI workflows
+- PlayMusic Desktop: desktop UX, React state, Tauri IPC, Rust-backed media processing
+
+This repository is especially fork-friendly: contributors can experiment with UI, playback, scanning, and desktop interaction ideas in their own forks, then bring small, well-explained improvements back through pull requests.
 
 ## Screenshots
 
@@ -62,6 +75,7 @@ A cross-platform media player built with Tauri, React, and Rust. Scans your home
 | 13 | Network streaming from custom API | Feature | Researching |
 | 14 | Mobile builds (Tauri 2.0 iOS / Android) | Feature | Researching |
 | 15 | Headphone removal auto-pause | Feature | Not possible without native platform APIs |
+| 16 | Contributor-friendly fork workflow docs | Docs | Planned |
 
 ## Usage
 
@@ -76,6 +90,22 @@ bun run tauri build
 ```
 
 Produces platform-native installers in `src-tauri/target/release/bundle/`.
+
+## Learning and Forks
+
+This project is designed to be useful as a learning open-source codebase. Forks are welcome as a normal way to explore ideas before they are ready for a focused pull request.
+
+Good fork-sized experiments include:
+
+- trying a new library layout
+- improving player controls
+- changing the video pane UX
+- experimenting with online search
+- improving scan performance
+- refining themes and visual states
+- adding small Rust/Tauri commands
+
+When bringing work back, prefer small pull requests with a clear explanation, screenshots for UI changes, and simple verification notes.
 
 ## Hotkeys
 
@@ -132,4 +162,3 @@ Produces platform-native installers in `src-tauri/target/release/bundle/`.
 The browser's `AudioContext.decodeAudioData` loads the full file into memory as raw PCM before any processing can begin. A 38-minute stereo track decodes to roughly 800MB of floats, which crashes the WebView process on large files.
 
 Moving waveform generation to Rust with `symphonia` bounded memory usage to the decoded portion (first 60s) regardless of file size, while also producing cleaner output via native format parsers.
-
