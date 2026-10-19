@@ -1,11 +1,15 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 
 export function useWaveform() {
   const [waveformData, setWaveformData] = useState<number[]>([])
   const [loading, setLoading] = useState(false)
+  // Only the latest request may update state: with quick track changes, an older
+  // waveform can arrive after a newer one.
+  const latest = useRef(0)
 
   async function generateWaveform(path: string | null): Promise<void> {
+    const request = ++latest.current
     setWaveformData([])
     if (!path) {
       setLoading(false)
@@ -14,6 +18,7 @@ export function useWaveform() {
     setLoading(true)
     try {
       const result = await invoke<{ samples: number[] }>('generate_waveform', { path })
+      if (request !== latest.current) return
 
       const data = result.samples
       const max = Math.max(...data)
@@ -24,10 +29,10 @@ export function useWaveform() {
 
       setWaveformData(normalized)
     } catch (e) {
-      console.error('waveform error:', e)
-      setWaveformData(Array.from({ length: 100 }, () => 0.5))
+      // e.g. an unsupported codec: the player keeps showing the plain progress line
+      if (request === latest.current) console.error('waveform error:', e)
     } finally {
-      setLoading(false)
+      if (request === latest.current) setLoading(false)
     }
   }
 

@@ -45,7 +45,7 @@ export function PlayerBar() {
   const { playing, duration, currentTime, toggle, seek, volume, changeVolume, toggleMute } =
     useAudioPlayer(videoRef, next)
 
-  const { waveformData, generateWaveform, loading } = useWaveform()
+  const { waveformData, generateWaveform } = useWaveform()
 
   const displayName = track?.name.replace(/\.[^/.]+$/, '') ?? 'No track selected'
   const trackIsVideo = track ? isVideo(track.ext) : false
@@ -151,7 +151,6 @@ export function PlayerBar() {
             currentTime={currentTime}
             duration={duration}
             onSeek={seek}
-            loading={loading}
           />
         </div>
 

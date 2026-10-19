@@ -174,7 +174,7 @@ ytdlp.rs ← yt_dlp_status / install_yt_dlp, finds/updates/runs yt-dlp
 | Command             | Purpose                                    | Sync/Async |
 | ------------------- | ------------------------------------------ | ---------- |
 | `scan_media`        | Recursive scan, emits progress events      | async      |
-| `generate_waveform` | Decode + downsample first 60s for waveform | sync       |
+| `generate_waveform` | Decode + downsample first 60s for waveform | async      |
 | `cover_art`         | Cover thumbnail for one track, as data URL | async      |
 | `search_online`     | yt-dlp `ytsearch10:` flat search           | async      |
 | `resolve_stream`    | yt-dlp lookup of a playable stream URL     | async      |
@@ -216,6 +216,10 @@ tracks use their YouTube thumbnail URL) and keeps up to 200 results in memory.
 - Bounded memory regardless of file size — fixes WebView crashes on large files
 - Downsampled to 100 normalized `f32` values
 - Returned to frontend as `{ samples: number[] }`
+- Async command: decoding runs on a blocking worker thread (`spawn_blocking`), so the UI stays
+  responsive while it's generated
+- `useWaveform` ignores results for tracks that are no longer current; `Waveform` shows a plain
+  progress line (same seek/hover behavior) until bars arrive, then fades them in
 
 ### Optional yt-dlp (`ytdlp.rs`)
 
