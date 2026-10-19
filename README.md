@@ -129,7 +129,7 @@ When bringing work back, prefer small pull requests with a clear explanation, sc
 
 ### Rust (src-tauri)
 
-- `scanner.rs` — `WalkDir`-based recursive scan, builds nested Directory/Album/MediaFile tree, emits `scan_progress` events every 10 files, returns `ScanResult` with metadata + duplicates
+- `scanner.rs` — `WalkDir`-based recursive scan, builds nested Directory/Album/MediaFile tree, emits `scan_count` per chunk and throttled `scan_progress` tree snapshots, returns `ScanResult` with metadata + duplicates
 - `waveform.rs` — `symphonia` decoder reads the first 60 seconds of audio and downsamples to 100 normalized `f32` bars
 - `lib.rs` — Tauri entry point, command registration
 
@@ -148,7 +148,7 @@ When bringing work back, prefer small pull requests with a clear explanation, sc
 ### IPC
 
 - JS → Rust: `invoke('scan_media')`, `invoke('generate_waveform', { path })`
-- Rust → JS: `emit('scan_progress', directories)` — batched every 10 files during scan
+- Rust → JS: `emit('scan_progress', directories)` — tree snapshot at most every 250 ms during scan; `emit('scan_count', n)` — files merged so far
 
 ## Why Tauri over Electron
 
