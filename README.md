@@ -17,7 +17,7 @@ terminal player, and is meant as a learning-friendly codebase (the repository is
 - On startup, scans `~/Downloads`, `~/Music`, `~/Videos`, `~/Desktop` and `~/Documents`, up to three
   folder levels deep, for audio (mp3, flac, wav, aac, ogg, m4a) and video (mp4, mkv, webm, avi, mov).
 - Groups files by top-level folder, then album (the first subfolder). The library fills in while
-  the scan is still running.
+  the scan is still running. Albums and tracks are sorted by name, with numbers in natural order (2 before 10).
 - Fuzzy search across file, album and folder names.
 - Collapsible albums; which ones are collapsed is remembered.
 - Duplicate detection: files with the same size and the same first and last 4 KiB are listed once
@@ -72,7 +72,6 @@ These work while nothing else has keyboard focus (click an empty area after usin
   Ubuntu 24.04 with WebKitGTK 2.52.6. Scanning, search and waveforms still work. Windows and macOS
   use different web engines (WebView2, WKWebView), so this is specific to Linux.
 - The scanned folders are fixed, and the library is only scanned at startup.
-- Tracks within an album are listed in filesystem order, not sorted by name.
 - Duplicates are only counted; there's no view of which files they are.
 - The waveform reflects the first 60 seconds of a track, stretched across the whole track.
 - Online streams are audio-only.
