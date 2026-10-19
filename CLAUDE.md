@@ -36,13 +36,13 @@ artifacts on pushes to `release`. Run the checks above yourself before pushing.
 
 Any `cargo check/test/build` runs `tauri-build`, which needs:
 
-- **The yt-dlp sidecar**: `src-tauri/binaries/yt-dlp-<target-triple>` (e.g.
-  `yt-dlp-x86_64-unknown-linux-gnu`, `yt-dlp-x86_64-pc-windows-msvc.exe`), declared as
-  `externalBin` in `tauri.conf.json`. It is not checked in. For compile/test-only work an
-  empty executable placeholder is enough; never commit one.
 - **`dist/`** must exist (`frontendDist`). Run `bun run build` once, or create it empty.
 - **Linux**: `libwebkit2gtk-4.1-dev libgtk-3-dev librsvg2-dev libsoup-3.0-dev` (and
   `build-essential`, `libssl-dev`).
+
+yt-dlp is **not** a build requirement. It's an optional runtime dependency that the app can
+download and update itself (see `src-tauri/src/ytdlp.rs`). Only installers built with
+`--config src-tauri/tauri.bundle-yt-dlp.conf.json` need `src-tauri/binaries/yt-dlp-<triple>`.
 
 ## Layout
 
@@ -59,7 +59,8 @@ src-tauri/src/
   lib.rs             registers commands and plugins
   scanner.rs         scan_media: walks ~/{Downloads,Music,Videos,Desktop,Documents}
   waveform.rs        generate_waveform: symphonia decode of the first 60 s → 100 bars
-  online.rs          search_online / resolve_stream via the yt-dlp sidecar
+  online.rs          search_online / resolve_stream (parse yt-dlp output)
+  ytdlp.rs           finds, installs, updates and runs yt-dlp (optional, app-managed)
 ```
 
 ## IPC contract
@@ -67,9 +68,11 @@ src-tauri/src/
 - Rust structs sent to JS derive `serde::Serialize` with snake_case fields; their TS
   mirrors live in `src/types.ts`. **Change both sides together.** (`scanner.rs` has a test
   pinning `MediaFile`'s field names.)
-- Commands: `scan_media`, `generate_waveform`, `search_online`, `resolve_stream`. New
-  commands must be added to `generate_handler!` in `lib.rs`. Shell/sidecar and window
-  permissions live in `src-tauri/capabilities/default.json`.
+- Commands: `scan_media`, `generate_waveform`, `search_online`, `resolve_stream`,
+  `yt_dlp_status`, `install_yt_dlp`. New commands must be added to `generate_handler!` in
+  `lib.rs`. Window permissions live in `src-tauri/capabilities/default.json`; Rust-side
+  process spawning (`tauri-plugin-shell`'s `command()`) isn't scoped by capabilities.
+- Run yt-dlp only through `ytdlp::run`, which handles lookup, locking and update-and-retry.
 - Scan events, listened to in `src/hooks/useScan.ts`: `scan_count` (files merged so far)
   and `scan_progress` (full `Directory[]` snapshot, throttled to ≤ 1 per 250 ms because
   each one re-serializes the whole tree).

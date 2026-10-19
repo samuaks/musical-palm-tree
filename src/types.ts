@@ -65,3 +65,14 @@ export interface OnlineSearchResult {
   thumbnail: string | null
   uploader: string | null
 }
+
+/** Mirrors `ytdlp::Status` in src-tauri/src/ytdlp.rs. */
+export interface YtDlpStatus {
+  available: boolean
+  can_install: boolean // the app can download yt-dlp itself on this platform
+}
+
+export interface YtDlpDownloadProgress {
+  downloaded: number
+  total: number | null
+}

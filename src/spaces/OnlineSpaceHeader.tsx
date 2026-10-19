@@ -12,6 +12,7 @@ export function OnlineSpaceHeader() {
   const setResults = useAppStore((s) => s.setOnlineResults)
   const setSearchState = useAppStore((s) => s.setOnlineSearchState)
   const setSearchError = useAppStore((s) => s.setOnlineSearchError)
+  const ready = useAppStore((s) => s.ytDlp?.available !== false)
 
   const searchSeq = useRef(0)
 
@@ -62,7 +63,8 @@ export function OnlineSpaceHeader() {
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="search youtube..."
+          disabled={!ready}
+          placeholder={ready ? 'search youtube...' : 'download yt-dlp below to search'}
           className="bg-transparent text-app-text text-sm font-mono placeholder-app-muted outline-none flex-1"
         />
       </div>

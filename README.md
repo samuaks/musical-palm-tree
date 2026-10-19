@@ -39,7 +39,7 @@ This repository is especially fork-friendly: contributors can experiment with UI
 - Support for audio (mp3, flac, wav, aac, ogg) and video (mp4, mkv, webm, avi, mov)
 - Native keyboard shortcuts (space, arrows) with scoped focus handling
 - Embedded cover art extracted via `lofty` and cached; durations read lazily from `<audio>` metadata
-- Online space: YouTube search and streaming via a bundled `yt-dlp` sidecar
+- Online space: YouTube search and streaming via `yt-dlp`, which the app can download and keep updated
 - Waveform generation server-side via `symphonia` to avoid WebView crashes on large files
 
 ## Supported Formats
@@ -97,8 +97,8 @@ Tests (Rust unit tests):
 cd src-tauri
 cargo test
 ```
-`tauri-build` needs `src-tauri/binaries/yt-dlp-<target-triple>` and a `dist/` folder to exist
-before any `cargo` command; see `CLAUDE.md` for details.
+`tauri-build` needs a `dist/` folder to exist before any `cargo` command (run `bun run build` once);
+see `CLAUDE.md` for details.
 
 ## Learning and Forks
 
@@ -128,16 +128,18 @@ When bringing work back, prefer small pull requests with a clear explanation, sc
 ## Online space (optional)
 
 The Online space (YouTube search and streaming) uses [yt-dlp](https://github.com/yt-dlp/yt-dlp).
-You don't need it to build or run the app: without it the Online space is hidden and the app is
-local-only. To enable it, either:
+You don't need it to build or run the app; local files work without it.
 
-- install yt-dlp so it's on your `PATH` (e.g. `winget install yt-dlp.yt-dlp`, `brew install yt-dlp`,
-  `pipx install yt-dlp`), or
-- bundle it into the installer: put the binary at `src-tauri/binaries/yt-dlp-<target-triple>` and build
-  with `bun run tauri build --config src-tauri/tauri.bundle-yt-dlp.conf.json`.
+The easiest way to enable it is in the app: open the Online space and click **download yt-dlp**.
+playmusic downloads the official standalone build for your platform from the latest yt-dlp release,
+checks it against the release's `SHA2-256SUMS`, and stores it in its app data folder (no admin rights
+needed, on Windows, macOS and Linux). It then checks for a new yt-dlp release once a day, and right away
+if a search or stream fails, since YouTube changes regularly break older versions.
 
-Dev builds also use `src-tauri/binaries/yt-dlp-<target-triple>` if it's there. The app checks for
-yt-dlp at startup, so restart it after installing.
+If you already manage yt-dlp yourself (`winget install yt-dlp.yt-dlp`, `brew install yt-dlp`,
+`pipx install yt-dlp`), playmusic finds it on your `PATH` and leaves updating it to you. To ship it
+inside an installer instead, put the binary at `src-tauri/binaries/yt-dlp-<target-triple>` and build with
+`bun run tauri build --config src-tauri/tauri.bundle-yt-dlp.conf.json`.
 
 ## Requirements
 
@@ -147,7 +149,6 @@ yt-dlp at startup, so restart it after installing.
 - On Windows: Microsoft C++ Build Tools
 - On macOS: Xcode Command Line Tools
 - On Linux: `webkit2gtk-4.1`, `build-essential`, `libssl-dev`
-- A `yt-dlp` binary at `src-tauri/binaries/yt-dlp-<target-triple>` (bundled as a Tauri sidecar, not checked in)
 
 ## Architecture
 
@@ -155,7 +156,8 @@ yt-dlp at startup, so restart it after installing.
 
 - `scanner.rs` — `WalkDir`-based recursive scan, builds nested Directory/Album/MediaFile tree, emits `scan_count` per chunk and throttled `scan_progress` tree snapshots, returns `ScanResult` with metadata + duplicates
 - `waveform.rs` — `symphonia` decoder reads the first 60 seconds of audio and downsamples to 100 normalized `f32` bars
-- `online.rs` — `search_online` / `resolve_stream` commands, run the `yt-dlp` sidecar and parse its JSON output
+- `online.rs` — `search_online` / `resolve_stream` commands, parse yt-dlp's JSON output
+- `ytdlp.rs` — finds, installs (verified download), updates and runs the optional yt-dlp
 - `lib.rs` — Tauri entry point, command and plugin registration
 
 ### React (src)
