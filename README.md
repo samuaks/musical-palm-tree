@@ -28,7 +28,8 @@ terminal player, and is meant as a learning-friendly codebase (the repository is
 - Plays audio and video. Next/previous follow the library order, and the next track starts when one
   ends.
 - Waveform overview in the player bar: click to seek, hover to preview the position. It's built in
-  Rust from the first 60 seconds of the track.
+  Rust from the first 60 seconds of the track. Until it's ready, and for tracks that have none
+  (online streams, unsupported codecs), a plain progress line does the same job.
 - Videos play in a resizable pane on the right; fullscreen with `F`, a double-click, or the
   fullscreen button. The player bar can be resized too.
 
