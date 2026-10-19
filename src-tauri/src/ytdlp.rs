@@ -45,8 +45,18 @@ struct DownloadProgress {
 #[derive(Debug, PartialEq)]
 struct Found {
     path: PathBuf,
-    /// Installed by the app into its data dir, so it's ours to update.
-    managed: bool,
+    source: Source,
+}
+
+#[derive(Debug, PartialEq, Clone, Copy)]
+enum Source {
+    /// Installed by the app into its data dir; updated in place.
+    Managed,
+    /// Shipped next to the executable by a release installer. It can't be updated in place
+    /// (read-only install dir), so once it's outdated a managed copy replaces it in use.
+    Bundled,
+    /// On PATH, from a package manager, or the dev sidecar: the user's to update.
+    External,
 }
 
 #[tauri::command]
@@ -74,17 +84,17 @@ pub async fn install_yt_dlp(app: AppHandle) -> Result<(), String> {
     Ok(())
 }
 
-/// Runs yt-dlp with `args` and returns its stdout. If the app-managed copy fails, it updates
-/// itself and retries once: most failures are YouTube changes that a newer yt-dlp fixes.
+/// Runs yt-dlp with `args` and returns its stdout. If a managed or bundled copy fails, it's
+/// updated and the command retried once: most failures are YouTube changes that a newer
+/// yt-dlp fixes.
 pub async fn run(app: &AppHandle, args: &[&str]) -> Result<String, String> {
     let found = locate(app).ok_or(NOT_FOUND)?;
     let mut output = exec(app, &found.path, args).await?;
 
-    if !output.status.success()
-        && found.managed
-        && is_due(&version_file(&found.path), RETRY_UPDATE_EVERY)
-        && update(&found.path).await
+    if !output.status.success() && update_due(app, RETRY_UPDATE_EVERY) && update(app, &found).await
     {
+        // An outdated bundled copy was superseded by a managed one, so look it up again.
+        let found = locate(app).ok_or(NOT_FOUND)?;
         output = exec(app, &found.path, args).await?;
     }
 
@@ -95,14 +105,17 @@ pub async fn run(app: &AppHandle, args: &[&str]) -> Result<String, String> {
     Ok(String::from_utf8_lossy(&output.stdout).into_owned())
 }
 
-/// Updates the managed copy at startup if it hasn't been checked in a day. A copy found
-/// anywhere else belongs to the user or their package manager and is left alone.
+/// At startup, updates the copy in use if it hasn't been checked in a day.
 pub async fn auto_update(app: AppHandle) {
-    if let Some(found) = locate(&app).filter(|f| f.managed) {
-        if is_due(&version_file(&found.path), UPDATE_EVERY) {
-            update(&found.path).await;
+    if let Some(found) = locate(&app) {
+        if update_due(&app, UPDATE_EVERY) {
+            update(&app, &found).await;
         }
     }
+}
+
+fn update_due(app: &AppHandle, interval: Duration) -> bool {
+    managed_path(app).is_some_and(|p| is_due(&version_file(&p), interval))
 }
 
 async fn exec(app: &AppHandle, path: &Path, args: &[&str]) -> Result<Output, String> {
@@ -115,42 +128,79 @@ async fn exec(app: &AppHandle, path: &Path, args: &[&str]) -> Result<Output, Str
         .map_err(|e| format!("yt-dlp execution failed: {e}"))
 }
 
-/// Replaces the managed copy with the newest release if it's newer. Returns whether it did.
+/// If the copy in use is older than the newest release, installs that release as the
+/// managed copy: in place for a managed copy, or alongside an outdated bundled one, which
+/// `locate` then stops using. External copies are left alone. Returns whether it installed.
+///
 /// This reuses the verified install download instead of `yt-dlp -U`, which goes through
-/// GitHub's rate-limited API and skips our checksum check.
-async fn update(path: &Path) -> bool {
-    let _lock = BINARY.write().await;
-    let Some(asset) = asset_name() else {
+/// GitHub's rate-limited API, skips our checksum check, and can't write to an install dir.
+async fn update(app: &AppHandle, found: &Found) -> bool {
+    if found.source == Source::External {
+        return false;
+    }
+    let (Some(asset), Some(dest)) = (asset_name(), managed_path(app)) else {
         return false;
     };
+    let _lock = BINARY.write().await;
     let Ok(release) = latest_release().await else {
         return false; // e.g. offline; try again next time
     };
-    let version_file = version_file(path);
-    let installed = std::fs::read_to_string(&version_file).unwrap_or_default();
-    let newer = installed.trim() != release.version;
-    if newer && download(&release, asset, path, |_, _| {}).await.is_err() {
+    let version_file = version_file(&dest);
+    let installed = match found.source {
+        Source::Managed => std::fs::read_to_string(&version_file).ok(),
+        _ => version_of(app, &found.path).await,
+    };
+    let outdated = is_outdated(installed.as_deref(), &release.version);
+    if outdated && download(&release, asset, &dest, |_, _| {}).await.is_err() {
         return false;
     }
-    // Rewritten even when unchanged: its mtime records when we last checked.
+    // The version now in use either way; the file's mtime records when we last checked.
+    if let Some(dir) = version_file.parent() {
+        std::fs::create_dir_all(dir).ok();
+    }
     std::fs::write(&version_file, &release.version).ok();
-    newer
+    outdated
+}
+
+/// `yt-dlp --version` of a copy we didn't install. Called with the write lock held, so it
+/// doesn't go through `exec`.
+async fn version_of(app: &AppHandle, path: &Path) -> Option<String> {
+    let output = app
+        .shell()
+        .command(path)
+        .arg("--version")
+        .output()
+        .await
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    parse_version(&String::from_utf8_lossy(&output.stdout))
+}
+
+fn parse_version(stdout: &str) -> Option<String> {
+    let version = stdout.lines().next()?.trim();
+    let valid = !version.is_empty()
+        && version
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '-');
+    valid.then(|| version.to_string())
+}
+
+/// A copy whose version is unknown (it wouldn't run, or was never recorded) counts as
+/// outdated, so a broken copy gets replaced too.
+fn is_outdated(installed: Option<&str>, latest: &str) -> bool {
+    installed.map(str::trim) != Some(latest)
 }
 
 /// Where yt-dlp is, preferring the app-managed copy: it's kept up to date, unlike a bundled
 /// sidecar or an old distro package.
 fn locate(app: &AppHandle) -> Option<Found> {
+    let found = |path, source| Some(Found { path, source });
     if let Some(path) = managed_path(app).filter(|p| p.is_file()) {
-        return Some(Found {
-            path,
-            managed: true,
-        });
+        return found(path, Source::Managed);
     }
 
-    // Builds made with `--config tauri.bundle-yt-dlp.conf.json` ship it next to the exe.
-    let exe_dir = std::env::current_exe()
-        .ok()
-        .and_then(|exe| exe.parent().map(Path::to_path_buf));
     // Dev builds also accept the old sidecar location, so existing setups keep working.
     let dev_sidecar = cfg!(debug_assertions).then(|| {
         PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -161,6 +211,19 @@ fn locate(app: &AppHandle) -> Option<Found> {
                 std::env::consts::EXE_SUFFIX
             ))
     });
+    if let Some(path) = dev_sidecar.filter(|p| p.is_file()) {
+        return found(path, Source::External);
+    }
+
+    // Release builds (made with `--config tauri.bundle-yt-dlp.conf.json`) ship it next to the
+    // executable.
+    let bundled = std::env::current_exe()
+        .ok()
+        .and_then(|exe| find_yt_dlp(exe.parent().map(Path::to_path_buf)));
+    if let Some(path) = bundled {
+        return found(path, Source::Bundled);
+    }
+
     let path_dirs = std::env::var_os("PATH")
         .map(|p| std::env::split_paths(&p).collect::<Vec<_>>())
         .unwrap_or_default();
@@ -171,13 +234,8 @@ fn locate(app: &AppHandle) -> Option<Found> {
         .into_iter()
         .chain(dirs::home_dir().map(|home| home.join(".local").join("bin")));
 
-    dev_sidecar
-        .filter(|p| p.is_file())
-        .or_else(|| find_yt_dlp(exe_dir.into_iter().chain(path_dirs).chain(common_dirs)))
-        .map(|path| Found {
-            path,
-            managed: false,
-        })
+    find_yt_dlp(path_dirs.into_iter().chain(common_dirs))
+        .and_then(|path| found(path, Source::External))
 }
 
 /// The first `yt-dlp` executable found in `dirs`, in order.
@@ -477,6 +535,29 @@ ffff *yt-dlp_macos
         assert!(!is_older_than(Some(now - hour / 2), hour, now));
         // A clock that went backwards doesn't trigger an update storm.
         assert!(!is_older_than(Some(now + hour), hour, now));
+    }
+
+    #[test]
+    fn parses_yt_dlp_version_output() {
+        assert_eq!(parse_version("2026.08.19\n"), Some("2026.08.19".into()));
+        assert_eq!(
+            parse_version("  2026.08.19  \r\nextra"),
+            Some("2026.08.19".into())
+        );
+        assert_eq!(parse_version(""), None);
+        assert_eq!(parse_version("\n2026.08.19"), None);
+        assert_eq!(parse_version("ERROR: something"), None);
+    }
+
+    #[test]
+    fn unknown_or_different_versions_are_outdated() {
+        assert!(!is_outdated(Some("2026.08.19"), "2026.08.19"));
+        assert!(!is_outdated(Some("2026.08.19\n"), "2026.08.19"));
+        assert!(is_outdated(Some("2024.12.23"), "2026.08.19"));
+        assert!(
+            is_outdated(None, "2026.08.19"),
+            "a copy that won't run gets replaced"
+        );
     }
 
     #[test]
