@@ -14,21 +14,18 @@ export function LocalSpaceHeader() {
       <div className="flex items-center gap-4 min-h-5">
         {scanMeta && (
           <div className="flex items-center gap-3 text-xs font-mono text-app-muted">
-            <span className="text-app-text">{scanMeta.total_files}</span>
-            <span>files</span>
-            <span className="text-app-muted">·</span>
-            <span className="text-app-text">{scanMeta.total_albums}</span>
-            <span>albums</span>
-            <span className="text-app-muted">·</span>
-            <span className="text-app-text">{scanMeta.total_directories}</span>
-            <span>dirs</span>
-            <span className="text-app-muted">·</span>
-            <span className="text-app-text">{scanMeta.duration_ms}ms</span>
+            <Stat value={scanMeta.total_files} label="file" />
+            <span>·</span>
+            <Stat value={scanMeta.total_albums} label="album" />
+            <span>·</span>
+            <Stat value={scanMeta.total_directories} label="dir" />
+            <span>·</span>
+            <span className="tabular-nums">{scanMeta.duration_ms}ms</span>
             {scanMeta.total_duplicates > 0 && (
               <>
-                <span className="text-app-muted">·</span>
-                <span className="text-app-accent font-bold">
-                  {scanMeta.total_duplicates} duplicates
+                <span>·</span>
+                <span className="tabular-nums">
+                  {plural(scanMeta.total_duplicates, 'duplicate')} hidden
                 </span>
               </>
             )}
@@ -62,4 +59,18 @@ export function LocalSpaceHeader() {
       </div>
     </div>
   )
+}
+
+/** A headline count: the number stands out, the label stays quiet. */
+function Stat({ value, label }: { value: number; label: string }) {
+  return (
+    <span className="flex items-baseline gap-1.5">
+      <span className="text-sm font-bold text-app-accent tabular-nums">{value}</span>
+      <span className="text-app-secondary">{value === 1 ? label : `${label}s`}</span>
+    </span>
+  )
+}
+
+function plural(n: number, word: string): string {
+  return `${n} ${n === 1 ? word : `${word}s`}`
 }
