@@ -28,17 +28,18 @@ This repository is especially fork-friendly: contributors can experiment with UI
 
 ## Features
 
-- Recursive scan of the home directory (up to 3 levels deep) on startup
+- Scan of `~/Downloads`, `~/Music`, `~/Videos`, `~/Desktop` and `~/Documents` (up to 3 levels deep) on startup
 - Automatic grouping by top-level directory → subfolder → file
 - Incremental UI updates streamed from Rust via Tauri events as files are found
 - Fuzzy search across filenames, albums, and directory names via `fuse.js`
-- Duplicate detection via partial MD5 hashing of file start/end bytes
+- Duplicate detection via partial MD5 hashing of file size + start/end bytes
 - Collapsible album sections with persisted state via `localStorage`
 - Soundcloud-style mirrored waveform visualizer with click-to-seek
 - Resizable player bar with drag handle that also hosts the video viewport
 - Support for audio (mp3, flac, wav, aac, ogg) and video (mp4, mkv, webm, avi, mov)
 - Native keyboard shortcuts (space, arrows) with scoped focus handling
-- Track metadata (duration, file size) read via `lofty`
+- Embedded cover art extracted via `lofty` and cached; durations read lazily from `<audio>` metadata
+- Online space: YouTube search and streaming via a bundled `yt-dlp` sidecar
 - Waveform generation server-side via `symphonia` to avoid WebView crashes on large files
 
 ## Supported Formats
@@ -68,7 +69,7 @@ This repository is especially fork-friendly: contributors can experiment with UI
 | 6 | Waveform visualizer | Feature | Done |
 | 7 | Video playback with resizable viewport | Feature | Done |
 | 8 | Custom scan directories via settings UI | Feature | Planned |
-| 9 | Parallel metadata reading with `rayon` | Perf | Planned |
+| 9 | Parallel metadata reading with `rayon` | Perf | Done |
 | 10 | Autocomplete dropdown with keyboard nav | Feature | Planned |
 | 11 | Playlist support | Feature | Planned |
 | 12 | Shuffle / loop modes | Feature | Planned |
@@ -90,6 +91,14 @@ bun run tauri build
 ```
 
 Produces platform-native installers in `src-tauri/target/release/bundle/`.
+
+Tests (Rust unit tests):
+```bash
+cd src-tauri
+cargo test
+```
+`tauri-build` needs `src-tauri/binaries/yt-dlp-<target-triple>` and a `dist/` folder to exist
+before any `cargo` command; see `CLAUDE.md` for details.
 
 ## Learning and Forks
 
@@ -124,6 +133,7 @@ When bringing work back, prefer small pull requests with a clear explanation, sc
 - On Windows: Microsoft C++ Build Tools
 - On macOS: Xcode Command Line Tools
 - On Linux: `webkit2gtk-4.1`, `build-essential`, `libssl-dev`
+- A `yt-dlp` binary at `src-tauri/binaries/yt-dlp-<target-triple>` (bundled as a Tauri sidecar, not checked in)
 
 ## Architecture
 
@@ -131,23 +141,26 @@ When bringing work back, prefer small pull requests with a clear explanation, sc
 
 - `scanner.rs` — `WalkDir`-based recursive scan, builds nested Directory/Album/MediaFile tree, emits `scan_count` per chunk and throttled `scan_progress` tree snapshots, returns `ScanResult` with metadata + duplicates
 - `waveform.rs` — `symphonia` decoder reads the first 60 seconds of audio and downsamples to 100 normalized `f32` bars
-- `lib.rs` — Tauri entry point, command registration
+- `online.rs` — `search_online` / `resolve_stream` commands, run the `yt-dlp` sidecar and parse its JSON output
+- `lib.rs` — Tauri entry point, command and plugin registration
 
 ### React (src)
 
-- `App.tsx` — top-level composition, listens to scan events, applies fuzzy filter via `useMemo`
-- `components/Library.tsx` — renders filtered directory tree with collapsible albums
+- `App.tsx` — top-level shell: titlebar, header, space sidebar, active space, video pane, player bar
+- `spaces/` — Local and Online spaces, registered in `spaces/index.tsx`
+- `store.ts` — Zustand store: playback queue, per-space state, collapsed albums (persisted to localStorage)
+- `components/Library.tsx` — renders the directory tree with collapsible albums, fuzzy-filtered via `useMemo`
 - `components/PlayerBar.tsx` — playback UI, resizable, hosts video element
-- `hooks/useMediaPlayer.ts` — unified audio/video playback, volume, mute, seek, keyboard shortcuts
+- `hooks/useScan.ts` — listens to scan events, invokes `scan_media`
+- `hooks/useAudioPlayer.ts` — unified audio/video playback, seek, keyboard shortcuts, online stream resolving
 - `hooks/useWaveform.ts` — invokes Rust `generate_waveform` command
 - `hooks/useResizable.ts` — generic drag-to-resize logic
-- `hooks/useCollapsed.ts` — Set-based collapse state with localStorage persistence
-- `hooks/usePlayer.ts` — flat track list navigation (next/prev)
+- `hooks/usePlayer.ts` — next/prev through the store queue
 - `utils/filterDirs.ts` — fuzzy search via weighted Fuse index
 
 ### IPC
 
-- JS → Rust: `invoke('scan_media')`, `invoke('generate_waveform', { path })`
+- JS → Rust: `invoke('scan_media')`, `invoke('generate_waveform', { path })`, `invoke('search_online', { query })`, `invoke('resolve_stream', { videoId })`
 - Rust → JS: `emit('scan_progress', directories)` — tree snapshot at most every 250 ms during scan; `emit('scan_count', n)` — files merged so far
 
 ## Why Tauri over Electron
@@ -164,8 +177,7 @@ The browser's `AudioContext.decodeAudioData` loads the full file into memory as 
 Moving waveform generation to Rust with `symphonia` bounded memory usage to the decoded portion (first 60s) regardless of file size, while also producing cleaner output via native format parsers.
 
 ## Releases
-Github action to create artifacts for different platforms
-Again for new release
 
-## Branch purpose
-> this branch is only for releases, no real work should be done here
+Pushing to the `release` branch runs `.github/workflows/publish.yml`, which builds installers for
+macOS (Apple Silicon and Intel), Linux and Windows and publishes them as a GitHub release tagged
+`app-v<version>`. Day-to-day work happens on `main`; don't commit directly to `release`.
