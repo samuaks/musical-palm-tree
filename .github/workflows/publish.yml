@@ -12,15 +12,25 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # target: the Rust triple Tauri expects in the sidecar's file name
+        # ytdlp: the matching standalone asset from the yt-dlp release
         include:
           - platform: 'macos-latest'
             args: '--target aarch64-apple-darwin'
+            target: 'aarch64-apple-darwin'
+            ytdlp: 'yt-dlp_macos' # universal binary
           - platform: 'macos-latest'
             args: '--target x86_64-apple-darwin'
+            target: 'x86_64-apple-darwin'
+            ytdlp: 'yt-dlp_macos'
           - platform: 'ubuntu-22.04'
             args: ''
+            target: 'x86_64-unknown-linux-gnu'
+            ytdlp: 'yt-dlp_linux'
           - platform: 'windows-latest'
             args: ''
+            target: 'x86_64-pc-windows-msvc'
+            ytdlp: 'yt-dlp.exe'
 
     runs-on: ${{ matrix.platform }}
     steps:
@@ -43,6 +53,40 @@ jobs:
       - name: install frontend dependencies
         run: bun install
 
+      # Bundle the latest yt-dlp as a sidecar so the Online space works out of the box.
+      - name: download yt-dlp
+        shell: bash
+        env:
+          ASSET: ${{ matrix.ytdlp }}
+          TARGET: ${{ matrix.target }}
+        run: |
+          set -euo pipefail
+          # Pin "latest" once (from where it redirects) so the binary and its checksum come
+          # from the same release.
+          sums=$(curl -sSf -o /dev/null -w '%{redirect_url}' \
+            https://github.com/yt-dlp/yt-dlp/releases/latest/download/SHA2-256SUMS)
+          base=${sums%/SHA2-256SUMS}
+          tag=${base##*/}
+          if [[ "$base" != "https://github.com/yt-dlp/yt-dlp/releases/download/$tag" || -z "$tag" ]]; then
+            echo "::error::couldn't resolve the latest yt-dlp release (got '$sums')"
+            exit 1
+          fi
+
+          suffix=""
+          [[ "$ASSET" == *.exe ]] && suffix=".exe"
+          dest="src-tauri/binaries/yt-dlp-$TARGET$suffix"
+          mkdir -p src-tauri/binaries
+          curl -sSfL -o "$dest" "$base/$ASSET"
+
+          expected=$(curl -sSfL "$base/SHA2-256SUMS" | awk -v a="$ASSET" '$2 == a { print $1 }')
+          actual=$( (sha256sum "$dest" 2>/dev/null || shasum -a 256 "$dest") | awk '{ print $1 }')
+          if [[ -z "$expected" || "$expected" != "$actual" ]]; then
+            echo "::error::yt-dlp $tag $ASSET checksum mismatch (expected '$expected', got '$actual')"
+            exit 1
+          fi
+          chmod +x "$dest"
+          echo "bundling yt-dlp $tag ($ASSET) as $dest"
+
       - uses: tauri-apps/tauri-action@v0.5.20
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -52,4 +96,4 @@ jobs:
           releaseBody: 'See the assets to download this version and install.'
           releaseDraft: false
           prerelease: false
-          args: ${{ matrix.args }}
+          args: ${{ matrix.args }} --config src-tauri/tauri.bundle-yt-dlp.conf.json
