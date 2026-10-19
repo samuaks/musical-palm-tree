@@ -134,7 +134,9 @@ The easiest way to enable it is in the app: open the Online space and click **do
 playmusic downloads the official standalone build for your platform from the latest yt-dlp release,
 checks it against the release's `SHA2-256SUMS`, and stores it in its app data folder (no admin rights
 needed, on Windows, macOS and Linux). It then checks for a new yt-dlp release once a day, and right away
-if a search or stream fails, since YouTube changes regularly break older versions.
+if a search or stream fails, since YouTube changes regularly break older versions. Release installers
+already include yt-dlp; when that bundled copy falls behind, playmusic downloads the newer one the same
+way and uses it instead.
 
 If you already manage yt-dlp yourself (`winget install yt-dlp.yt-dlp`, `brew install yt-dlp`,
 `pipx install yt-dlp`), playmusic finds it on your `PATH` and leaves updating it to you. To ship it

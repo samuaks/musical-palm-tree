@@ -219,10 +219,16 @@ runs without it (local-only). `ytdlp.rs` owns finding, installing, updating and 
   the platform's standalone asset (`yt-dlp.exe`, `yt-dlp_macos`, `yt-dlp_linux`, ...) from that
   same release, verifies its SHA-256, and renames it into place. Emits `yt_dlp_download` progress
   events. `yt-dlp.version` next to the binary records the installed version.
-- **Update**: only the app-managed copy is updated (copies elsewhere belong to the user or a
-  package manager). It's checked at startup if more than a day has passed, and when a command
-  fails (at most hourly), after which the command is retried once. Updating reuses the verified
-  install download rather than `yt-dlp -U`.
+- **Update**: checked at startup if more than a day has passed, and when a command fails (at
+  most hourly), after which the command is retried once. It depends on where the copy in use
+  came from (`Source`):
+  - *Managed*: replaced in place when a newer release exists.
+  - *Bundled* (next to the executable, shipped by release installers): it's in a read-only
+    install dir, so when its `--version` is older than the latest release, the latest is
+    installed as the managed copy, which `locate` prefers from then on.
+  - *External* (`PATH`, package managers, the dev sidecar): left to the user.
+  Updating reuses the verified install download rather than `yt-dlp -U`. `yt-dlp.version` holds
+  the version in use; its mtime is the last check.
 - An `RwLock` keeps updates from replacing the binary while it runs, which Windows doesn't
   allow.
 - **Frontend**: `yt_dlp_status` returns `{ available, can_install }`. `useOnlineAvailability`
