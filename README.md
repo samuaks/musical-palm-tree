@@ -39,7 +39,7 @@ This repository is especially fork-friendly: contributors can experiment with UI
 - Support for audio (mp3, flac, wav, aac, ogg) and video (mp4, mkv, webm, avi, mov)
 - Native keyboard shortcuts (space, arrows) with scoped focus handling
 - Embedded cover art extracted via `lofty` and cached; durations read lazily from `<audio>` metadata
-- Online space: YouTube search and streaming via a bundled `yt-dlp` sidecar
+- Online space: YouTube search and streaming via `yt-dlp`, which the app can download and keep updated
 - Waveform generation server-side via `symphonia` to avoid WebView crashes on large files
 
 ## Supported Formats
@@ -97,8 +97,8 @@ Tests (Rust unit tests):
 cd src-tauri
 cargo test
 ```
-`tauri-build` needs `src-tauri/binaries/yt-dlp-<target-triple>` and a `dist/` folder to exist
-before any `cargo` command; see `CLAUDE.md` for details.
+`tauri-build` needs a `dist/` folder to exist before any `cargo` command (run `bun run build` once);
+see `CLAUDE.md` for details.
 
 ## Learning and Forks
 
@@ -149,7 +149,6 @@ inside an installer instead, put the binary at `src-tauri/binaries/yt-dlp-<targe
 - On Windows: Microsoft C++ Build Tools
 - On macOS: Xcode Command Line Tools
 - On Linux: `webkit2gtk-4.1`, `build-essential`, `libssl-dev`
-- A `yt-dlp` binary at `src-tauri/binaries/yt-dlp-<target-triple>` (bundled as a Tauri sidecar, not checked in)
 
 ## Architecture
 
@@ -157,7 +156,8 @@ inside an installer instead, put the binary at `src-tauri/binaries/yt-dlp-<targe
 
 - `scanner.rs` — `WalkDir`-based recursive scan, builds nested Directory/Album/MediaFile tree, emits `scan_count` per chunk and throttled `scan_progress` tree snapshots, returns `ScanResult` with metadata + duplicates
 - `waveform.rs` — `symphonia` decoder reads the first 60 seconds of audio and downsamples to 100 normalized `f32` bars
-- `online.rs` — `search_online` / `resolve_stream` commands, run the `yt-dlp` sidecar and parse its JSON output
+- `online.rs` — `search_online` / `resolve_stream` commands, parse yt-dlp's JSON output
+- `ytdlp.rs` — finds, installs (verified download), updates and runs the optional yt-dlp
 - `lib.rs` — Tauri entry point, command and plugin registration
 
 ### React (src)

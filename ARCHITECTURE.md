@@ -101,7 +101,7 @@ the root level, not inside any space.
 | Space  | Source                   | Status         |
 | ------ | ------------------------ | -------------- |
 | Local  | Filesystem scan via Rust | ✅ Implemented |
-| Online | YouTube search/streaming via yt-dlp sidecar | ✅ Implemented |
+| Online | YouTube search/streaming via optional yt-dlp | ✅ Implemented |
 
 ### Adding a New Space
 
@@ -165,7 +165,8 @@ App.tsx
 lib.rs ← entry, registers commands, runs Tauri
 scanner.rs ← scan_media command, walks filesystem with rayon
 waveform.rs ← generate_waveform command, decodes via symphonia
-online.rs ← search_online / resolve_stream commands, run the yt-dlp sidecar
+online.rs ← search_online / resolve_stream commands
+ytdlp.rs ← yt_dlp_status / install_yt_dlp, finds/updates/runs yt-dlp
 
 ### Tauri Commands
 
@@ -175,6 +176,8 @@ online.rs ← search_online / resolve_stream commands, run the yt-dlp sidecar
 | `generate_waveform` | Decode + downsample first 60s for waveform | sync       |
 | `search_online`     | yt-dlp `ytsearch10:` flat search           | async      |
 | `resolve_stream`    | yt-dlp lookup of a playable stream URL     | async      |
+| `yt_dlp_status`     | Whether yt-dlp is found / installable      | sync       |
+| `install_yt_dlp`    | Download + verify yt-dlp into app data dir | async      |
 
 ### Scan Pipeline (3-phase, parallelized)
 
