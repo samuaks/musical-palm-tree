@@ -1,19 +1,14 @@
-use lofty::config::ParseOptions;
-use lofty::file::TaggedFileExt;
-use lofty::probe::Probe;
 use rayon::prelude::*;
 use std::collections::{BTreeMap, HashMap};
 use std::fs::File;
 use std::io::{Read, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant, UNIX_EPOCH};
-use tauri::{Emitter, Manager};
+use tauri::Emitter;
 use walkdir::WalkDir;
 
-const AUDIO_EXT: &[&str] = &["mp3", "flac", "wav", "aac", "ogg"];
+const AUDIO_EXT: &[&str] = &["mp3", "flac", "wav", "aac", "ogg", "m4a"];
 const VIDEO_EXT: &[&str] = &["mp4", "mkv", "webm", "avi", "mov"];
-/// Formats lofty can read embedded cover art from. Others skip art extraction entirely.
-const ART_EXT: &[&str] = &["mp3", "flac", "wav", "aac", "ogg", "mp4"];
 const ALLOWED_DIRS: &[&str] = &["Downloads", "Music", "Videos", "Desktop", "Documents"];
 /// Depth below each allowed dir (same reach as the old max_depth(4) from home).
 const MAX_DEPTH: usize = 3;
@@ -29,7 +24,6 @@ pub struct MediaFile {
     ext: String,
     duration_secs: f64,
     size_bytes: u64,
-    art_path: Option<String>,
     created_at: u64,
 }
 
@@ -147,16 +141,12 @@ pub async fn scan_media(app: tauri::AppHandle) -> Result<ScanResult, String> {
 fn scan(app: &tauri::AppHandle) -> ScanResult {
     let start = Instant::now();
     let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("/"));
-    let cache_dir = app
-        .path()
-        .app_cache_dir()
-        .unwrap_or_else(|_| PathBuf::from("./cache"));
-    let _ = std::fs::create_dir_all(&cache_dir);
 
     // Phase 1: walk only the allowed dirs (in parallel) and collect media paths.
     let entries = collect_entries(&home);
 
-    // Phase 2: metadata, hash and cover art in parallel, one chunk at a time.
+    // Phase 2: metadata and hash in parallel, one chunk at a time. Cover art is extracted
+    // on demand for the playing track (see art.rs), not here.
     // Phase 3: merge each chunk sequentially in walk order, so "first seen" is deterministic.
     let mut library = Library::default();
     let mut last_progress = Instant::now();
@@ -167,10 +157,7 @@ fn scan(app: &tauri::AppHandle) -> ScanResult {
         if chunk.is_empty() {
             break;
         }
-        let processed: Vec<Processed> = chunk
-            .into_par_iter()
-            .map(|entry| process(entry, &cache_dir))
-            .collect();
+        let processed: Vec<Processed> = chunk.into_par_iter().map(process).collect();
 
         for p in processed {
             library.add(p);
@@ -236,7 +223,7 @@ fn collect_entries(home: &Path) -> Vec<Entry> {
         .collect()
 }
 
-fn process(entry: Entry, cache_dir: &Path) -> Processed {
+fn process(entry: Entry) -> Processed {
     // One metadata call instead of two.
     let meta = std::fs::metadata(&entry.path).ok();
     let size_bytes = meta.as_ref().map_or(0, |m| m.len());
@@ -250,11 +237,6 @@ fn process(entry: Entry, cache_dir: &Path) -> Processed {
         .as_ref()
         .and_then(|m| partial_hash(&entry.path, m.len()));
 
-    let art_path = match &hash {
-        Some(h) if ART_EXT.contains(&entry.ext) => cached_art(&entry.path, cache_dir, h),
-        _ => None,
-    };
-
     Processed {
         top: entry.top,
         album: entry.album,
@@ -265,15 +247,15 @@ fn process(entry: Entry, cache_dir: &Path) -> Processed {
             ext: entry.ext.to_string(),
             duration_secs: 0.0,
             size_bytes,
-            art_path,
             created_at,
         },
     }
 }
 
 /// Hash of file size + first 4 KiB + last 4 KiB. Fast, but a match is a strong hint,
-/// not proof: confirm with a full hash if you ever delete files based on it.
-fn partial_hash(path: &Path, size: u64) -> Option<String> {
+/// not proof: confirm with a full hash if you ever delete files based on it. Also keys the
+/// cover-art cache in art.rs.
+pub(crate) fn partial_hash(path: &Path, size: u64) -> Option<String> {
     const SAMPLE: u64 = 4096;
     let mut file = File::open(path).ok()?;
     let mut buf = [0u8; SAMPLE as usize];
@@ -293,42 +275,6 @@ fn partial_hash(path: &Path, size: u64) -> Option<String> {
     }
 
     Some(format!("{:x}", ctx.compute()))
-}
-
-fn cached_art(path: &Path, cache_dir: &Path, hash: &str) -> Option<String> {
-    let art = cache_dir.join(format!("art_{hash}.jpg"));
-    if art.exists() {
-        return Some(art.to_string_lossy().into_owned());
-    }
-
-    // Marker so files without art aren't re-parsed on every scan.
-    let no_art = cache_dir.join(format!("art_{hash}.none"));
-    if no_art.exists() {
-        return None;
-    }
-
-    let tagged = Probe::open(path)
-        .ok()? // I/O error: bail without writing a marker, retry next scan
-        .options(ParseOptions::new().read_properties(false)) // skip duration/bitrate parsing
-        .guess_file_type()
-        .ok()
-        .and_then(|p| p.read().ok());
-
-    let picture = tagged
-        .as_ref()
-        .and_then(|f| f.primary_tag().or_else(|| f.first_tag()))
-        .and_then(|t| t.pictures().first());
-
-    match picture {
-        Some(pic) => {
-            std::fs::write(&art, pic.data()).ok()?;
-            Some(art.to_string_lossy().into_owned())
-        }
-        None => {
-            let _ = std::fs::write(&no_art, b"");
-            None
-        }
-    }
 }
 
 #[cfg(test)]
@@ -378,35 +324,9 @@ mod tests {
                 ext: "mp3".to_string(),
                 duration_secs: 0.0,
                 size_bytes: 0,
-                art_path: None,
                 created_at: 0,
             },
         }
-    }
-
-    /// A minimal MP3: an ID3v2 tag holding `cover`, followed by a few silent MPEG frames.
-    fn mp3_with_cover(cover: &[u8]) -> Vec<u8> {
-        use lofty::config::WriteOptions;
-        use lofty::picture::{MimeType, Picture, PictureType};
-        use lofty::tag::{Tag, TagExt, TagType};
-
-        let mut tag = Tag::new(TagType::Id3v2);
-        tag.push_picture(Picture::new_unchecked(
-            PictureType::CoverFront,
-            Some(MimeType::Jpeg),
-            None,
-            cover.to_vec(),
-        ));
-        let mut out = Vec::new();
-        tag.dump_to(&mut out, WriteOptions::default()).unwrap();
-
-        // MPEG-1 Layer III, 128 kbps, 44.1 kHz: 417-byte frames.
-        let mut frame = vec![0u8; 417];
-        frame[..4].copy_from_slice(&[0xFF, 0xFB, 0x90, 0x64]);
-        for _ in 0..4 {
-            out.extend_from_slice(&frame);
-        }
-        out
     }
 
     // --- partial_hash ---
@@ -483,6 +403,7 @@ mod tests {
         for f in [
             "Music/loose.mp3",
             "Music/Album/track.FLAC",
+            "Music/Album/itunes.M4A",
             "Music/Album/Disc 1/track.ogg",
             "Music/A/B/C/too_deep.mp3",
             "Music/notes.txt",
@@ -506,6 +427,7 @@ mod tests {
             got,
             vec![
                 ("Music", None, "loose.mp3".to_string(), "mp3"),
+                ("Music", album(), "itunes.M4A".to_string(), "m4a"),
                 ("Music", album(), "track.FLAC".to_string(), "flac"),
                 ("Music", album(), "track.ogg".to_string(), "ogg"),
                 ("Videos", None, "clip.MKV".to_string(), "mkv"),
@@ -531,7 +453,7 @@ mod tests {
         assert!(collect_entries(&home.path().join("does-not-exist")).is_empty());
     }
 
-    // --- process / cached_art ---
+    // --- process ---
 
     #[test]
     fn process_fills_in_file_metadata() {
@@ -539,7 +461,7 @@ mod tests {
         let path = dir.path().join("Music/song.mp3");
         write(&path, b"not really an mp3");
 
-        let p = process(entry(&path, "mp3"), dir.path());
+        let p = process(entry(&path, "mp3"));
         assert_eq!(p.top, "Music");
         assert_eq!(p.hash, partial_hash(&path, 17));
         assert_eq!(p.file.path, path.to_string_lossy());
@@ -549,99 +471,11 @@ mod tests {
     }
 
     #[test]
-    fn process_of_missing_file_has_no_hash_or_art() {
+    fn process_of_missing_file_has_no_hash() {
         let dir = TempDir::new().unwrap();
-        let p = process(entry(&dir.path().join("gone.mp3"), "mp3"), dir.path());
+        let p = process(entry(&dir.path().join("gone.mp3"), "mp3"));
         assert_eq!(p.hash, None);
         assert_eq!(p.file.size_bytes, 0);
-        assert_eq!(p.file.art_path, None);
-    }
-
-    #[test]
-    fn embedded_cover_is_extracted_to_cache() {
-        let dir = TempDir::new().unwrap();
-        let cache = dir.path().join("cache");
-        std::fs::create_dir_all(&cache).unwrap();
-        let cover = b"\xFF\xD8\xFFfake jpeg bytes";
-        let path = dir.path().join("Music/with_art.mp3");
-        write(&path, &mp3_with_cover(cover));
-
-        let p = process(entry(&path, "mp3"), &cache);
-        let art = p.file.art_path.expect("cover art should be extracted");
-        assert_eq!(
-            art,
-            cache
-                .join(format!("art_{}.jpg", p.hash.unwrap()))
-                .to_string_lossy()
-        );
-        assert_eq!(std::fs::read(&art).unwrap(), cover);
-    }
-
-    #[test]
-    fn file_without_art_gets_a_none_marker() {
-        let dir = TempDir::new().unwrap();
-        let path = dir.path().join("no_art.mp3");
-        write(&path, b"not really an mp3");
-
-        let p = process(entry(&path, "mp3"), dir.path());
-        assert_eq!(p.file.art_path, None);
-        assert!(dir
-            .path()
-            .join(format!("art_{}.none", p.hash.unwrap()))
-            .exists());
-    }
-
-    #[test]
-    fn cached_art_is_reused_without_parsing() {
-        let dir = TempDir::new().unwrap();
-        let path = dir.path().join("song.mp3");
-        write(&path, b"not really an mp3");
-        let cached = dir.path().join("art_abc.jpg");
-        write(&cached, b"cached");
-
-        assert_eq!(
-            cached_art(&path, dir.path(), "abc"),
-            Some(cached.to_string_lossy().into_owned())
-        );
-    }
-
-    #[test]
-    fn none_marker_skips_parsing() {
-        // The file has real art, but the marker says otherwise, so it isn't read.
-        let dir = TempDir::new().unwrap();
-        let path = dir.path().join("song.mp3");
-        write(&path, &mp3_with_cover(b"cover"));
-        write(&dir.path().join("art_abc.none"), b"");
-
-        assert_eq!(cached_art(&path, dir.path(), "abc"), None);
-        assert!(!dir.path().join("art_abc.jpg").exists());
-    }
-
-    #[test]
-    fn unreadable_file_writes_no_marker() {
-        // I/O errors should be retried next scan, not cached as "no art".
-        let dir = TempDir::new().unwrap();
-        assert_eq!(
-            cached_art(&dir.path().join("gone.mp3"), dir.path(), "abc"),
-            None
-        );
-        assert!(!dir.path().join("art_abc.none").exists());
-    }
-
-    #[test]
-    fn formats_without_art_support_are_not_probed() {
-        let dir = TempDir::new().unwrap();
-        let path = dir.path().join("Videos/clip.mkv");
-        write(&path, b"not really a video");
-
-        let p = process(entry(&path, "mkv"), dir.path());
-        assert_eq!(p.file.art_path, None);
-        let cached: Vec<_> = std::fs::read_dir(dir.path())
-            .unwrap()
-            .filter_map(Result::ok)
-            .filter(|e| e.file_name().to_string_lossy().starts_with("art_"))
-            .collect();
-        assert!(cached.is_empty(), "no marker or art should be written");
     }
 
     // --- Library ---
@@ -724,7 +558,6 @@ mod tests {
         assert_eq!(
             keys,
             [
-                "art_path",
                 "created_at",
                 "duration_secs",
                 "ext",

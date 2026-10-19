@@ -58,6 +58,7 @@ src/
 src-tauri/src/
   lib.rs             registers commands and plugins
   scanner.rs         scan_media: walks ~/{Downloads,Music,Videos,Desktop,Documents}
+  art.rs             cover_art: embedded or folder cover → cached thumbnail → data URL
   waveform.rs        generate_waveform: symphonia decode of the first 60 s → 100 bars
   online.rs          search_online / resolve_stream (parse yt-dlp output)
   ytdlp.rs           finds, installs, updates and runs yt-dlp (optional, app-managed)
@@ -68,16 +69,17 @@ src-tauri/src/
 - Rust structs sent to JS derive `serde::Serialize` with snake_case fields; their TS
   mirrors live in `src/types.ts`. **Change both sides together.** (`scanner.rs` has a test
   pinning `MediaFile`'s field names.)
-- Commands: `scan_media`, `generate_waveform`, `search_online`, `resolve_stream`,
-  `yt_dlp_status`, `install_yt_dlp`. New commands must be added to `generate_handler!` in
+- Commands: `scan_media`, `generate_waveform`, `cover_art`, `search_online`,
+  `resolve_stream`, `yt_dlp_status`, `install_yt_dlp`. New commands must be added to `generate_handler!` in
   `lib.rs`. Window permissions live in `src-tauri/capabilities/default.json`; Rust-side
   process spawning (`tauri-plugin-shell`'s `command()`) isn't scoped by capabilities.
 - Run yt-dlp only through `ytdlp::run`, which handles lookup, locking and update-and-retry.
 - Scan events, listened to in `src/hooks/useScan.ts`: `scan_count` (files merged so far)
   and `scan_progress` (full `Directory[]` snapshot, throttled to ≤ 1 per 250 ms because
   each one re-serializes the whole tree).
-- Local files and cached art reach the WebView through the asset protocol
-  (`convertFileSrc`), scoped to `$HOME/**` and `$APPCACHE/**` in `tauri.conf.json`.
+- Local media files reach the WebView through the asset protocol (`convertFileSrc`),
+  scoped to `$HOME/**` and `$APPCACHE/**` in `tauri.conf.json`. Cover art doesn't: it comes
+  back from `cover_art` as a `data:` URL.
 
 ## Conventions
 
@@ -120,9 +122,10 @@ src-tauri/src/
   no album; otherwise the first subfolder is the album.
 - Duplicates come from a partial MD5 of size + first 4 KiB + last 4 KiB. A match is a
   strong hint, not proof; hash the whole file before ever deleting anything.
-- Cover art is cached as `app_cache_dir/art_<hash>.jpg`; files with no art get an empty
-  `art_<hash>.none` marker so they aren't re-parsed every scan. Changing the hash format
-  invalidates the cache (it's re-extracted once).
+- Cover art is extracted on demand for the playing track (not during the scan) and cached
+  as 256 px thumbnails: `app_cache_dir/cover_<partial hash>.jpg`, or an empty
+  `cover_<hash>.none` when there's no embedded art. Folder images (`cover.jpg` etc.) are the
+  fallback and are never cached as "none". Changing the hash format invalidates the cache.
 - Waveforms are generated in Rust because `AudioContext.decodeAudioData` loads whole files
   as PCM and crashes the WebView on long tracks. Don't move this back to JS.
 
