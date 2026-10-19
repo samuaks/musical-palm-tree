@@ -194,4 +194,6 @@ Moving waveform generation to Rust with `symphonia` bounded memory usage to the 
 
 Pushing to the `release` branch runs `.github/workflows/publish.yml`, which builds installers for
 macOS (Apple Silicon and Intel), Linux and Windows and publishes them as a GitHub release tagged
-`app-v<version>`. Day-to-day work happens on `main`; don't commit directly to `release`.
+`app-v<version>`. Each build downloads the latest yt-dlp release for its platform, checks it against
+yt-dlp's `SHA2-256SUMS`, and bundles it (via `src-tauri/tauri.bundle-yt-dlp.conf.json`), so the Online
+space works out of the box. Day-to-day work happens on `main`; don't commit directly to `release`.
