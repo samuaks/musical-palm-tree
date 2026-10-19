@@ -56,7 +56,7 @@ Rust, and Rust handles heavier filesystem and media work.
 
 ## Tech Stack
 
-- **Frontend**: React 18 + TypeScript + Vite + Tailwind CSS v4
+- **Frontend**: React 19 + TypeScript + Vite + Tailwind CSS v4
 - **Backend**: Rust (Tauri 2) for filesystem scanning, audio decoding, OS integration
 - **State**: Zustand for global state, no React Context
 - **Package manager**: Bun
@@ -67,7 +67,7 @@ Rust, and Rust handles heavier filesystem and media work.
 ┌─────────────────────────────────────────────────┐
 │ Titlebar (custom — minimize/maximize/close) │
 ├─────────────────────────────────────────────────┤
-│ Header (logo, scan stats, search bar) │
+│ Header (active space header + theme toggle) │
 ├──────┬──────────────────────────────────────────┤
 │ │ │
 │Space │ Active Space Component │
@@ -90,6 +90,7 @@ Each space defines:
 - `name` — display name
 - `icon` — JSX element for the sidebar
 - `Component` — the React component rendered when the space is active
+- `Header` — the component rendered in the top header (stats, search) when active
 
 Switching spaces does NOT pause playback. The player bar, video pane, audio
 volume, and current track persist across space switches because they live at
@@ -100,12 +101,12 @@ the root level, not inside any space.
 | Space  | Source                   | Status         |
 | ------ | ------------------------ | -------------- |
 | Local  | Filesystem scan via Rust | ✅ Implemented |
-| Online | yt-dlp search/streaming  | 🚧 Placeholder |
+| Online | YouTube search/streaming via yt-dlp sidecar | ✅ Implemented |
 
 ### Adding a New Space
 
-1. Create `src/spaces/MySpace.tsx` with a default export component
-2. Add it to `SPACES` array in `src/spaces/index.tsx`
+1. Create `src/spaces/MySpace.tsx` and `src/spaces/MySpaceHeader.tsx`
+2. Add `{ id, name, icon, Component, Header }` to the `SPACES` array in `src/spaces/index.tsx`
 3. Add per-space state to `spaces` object in `src/store.ts` if needed
 4. Sidebar icon appears automatically
 
@@ -115,9 +116,11 @@ Single store at `src/store.ts`. Three categories of state:
 
 ### Root-level (shared across spaces)
 
-- `activeSpaceId` — currently selected space
-- `currentTrack` — the playing track (regardless of source)
+- `activeSpaceId` — currently selected space (persisted)
+- `queue` / `queueIndex` — the play queue, the single source of truth for playback;
+  the current track (local or online) is derived via `selectCurrentTrack`
 - `playing` — playback state (true/false)
+- `resolving` — an online stream URL is being resolved
 - `theme` — `'dark' | 'light'`
 
 ### Per-space (namespaced under `spaces.{id}`)
@@ -129,6 +132,7 @@ Single store at `src/store.ts`. Three categories of state:
 - `spaces.local.query` — search input
 - `spaces.local.durations` — `Record<path, seconds>` filled lazily
 - `spaces.local.collapsed` — `Set<string>` of collapsed album keys
+- `spaces.online.query` / `results` / `searchState` / `searchError` — online search
 
 ### Selective subscriptions
 
@@ -142,7 +146,7 @@ const dirs = useAppStore((s) => s.spaces.local.dirs)
 
 App.tsx
 ├── Titlebar
-├── Header
+├── Header ← active space's Header + ThemeToggle
 ├── (main row)
 │ ├── SpaceSidebar
 │ ├── <ActiveSpace /> ← LocalSpace, OnlineSpace, etc.
@@ -161,6 +165,7 @@ App.tsx
 lib.rs ← entry, registers commands, runs Tauri
 scanner.rs ← scan_media command, walks filesystem with rayon
 waveform.rs ← generate_waveform command, decodes via symphonia
+online.rs ← search_online / resolve_stream commands, run the yt-dlp sidecar
 
 ### Tauri Commands
 
@@ -168,6 +173,8 @@ waveform.rs ← generate_waveform command, decodes via symphonia
 | ------------------- | ------------------------------------------ | ---------- |
 | `scan_media`        | Recursive scan, emits progress events      | async      |
 | `generate_waveform` | Decode + downsample first 60s for waveform | sync       |
+| `search_online`     | yt-dlp `ytsearch10:` flat search           | async      |
+| `resolve_stream`    | yt-dlp lookup of a playable stream URL     | async      |
 
 ### Scan Pipeline (3-phase, parallelized)
 
@@ -200,12 +207,14 @@ most every 250 ms.
 | ---------------- | ------------------------------------------------------------ |
 | `useScan`        | Mounts scan listeners, invokes `scan_media`, writes to store |
 | `useDurations`   | Lazily fills track durations via `<audio>` metadata          |
-| `useMediaPlayer` | Audio/video playback controls, time, volume                  |
+| `useAudioPlayer` | Audio/video playback, seek, keyboard shortcuts, stream resolve |
 | `useVolume`      | Volume state with localStorage persistence + mute toggle     |
 | `useWaveform`    | Invokes Rust `generate_waveform`, manages loading state      |
 | `useResizable`   | Generic horizontal/vertical drag-to-resize with persistence  |
 | `useFullscreen`  | Browser fullscreen API wrapper                               |
-| `usePlayer`      | Next/prev track navigation across the flat track list        |
+| `usePlayer`      | Next/prev through the store queue                            |
+| `useLocalFlatTracks` | All local tracks flattened in Library order, for enqueueing |
+| `useAudioNormalization` | Web Audio compressor/gain chain (not currently wired up) |
 
 ## Theming
 
@@ -220,10 +229,11 @@ localStorage and applies via `document.documentElement.dataset.theme`.
 Background gradients on `body` provide visual depth that's preserved by
 translucent panel surfaces (`bg-app-bg/80`).
 
-## Window Vibrancy (Windows)
+## Custom Window Chrome
 
 - `tauri.conf.json` — `transparent: true, decorations: false`
-- `lib.rs` — applies Mica (Win11) / Acrylic (Win10) via `window-vibrancy` crate
+- `components/TitleBar.tsx` — draws minimize/maximize/close and the drag region; the
+  matching window permissions are in `src-tauri/capabilities/default.json`
 - `body` background uses linear gradient, panels use translucent backgrounds
 
 ## Persistence
@@ -231,6 +241,7 @@ translucent panel surfaces (`bg-app-bg/80`).
 Stored in localStorage:
 
 - `playmusic-theme` — current theme
+- `playmusic-active-space` — last selected space
 - `playmusic-volume` — last volume setting
 - `playmusic-collapsed` — Set of collapsed album keys
 - `playmusic-playerbar-height` — last drag-resized player bar height

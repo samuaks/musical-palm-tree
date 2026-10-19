@@ -125,7 +125,14 @@ src-tauri/src/
 
 ## Git and PRs
 
-- Work branches off `main`; feature branches are usually `<issue-number>-<slug>`.
+- **One branch per task, always based on the latest `main`.** When starting a feature or
+  task that isn't a direct continuation of the current one, `git fetch origin main` and
+  create a new branch from `origin/main`, even if you're already on a branch. Don't stack
+  unrelated work on an existing branch, and never add commits to a branch whose PR is
+  already merged: start a new branch from `main` (or rebase your unpushed commits onto
+  it). Follow-ups to the current task (review fixes, small related edits) stay on its
+  branch.
+- Feature branches are usually `<issue-number>-<slug>`.
 - **Never commit to `release`.** Pushing there publishes installers for every platform.
 - Keep PRs small and focused, with a clear explanation, verification notes (what you ran)
   and screenshots for UI changes.
