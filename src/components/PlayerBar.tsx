@@ -9,6 +9,8 @@ import {
   VolumeX,
   Maximize,
   Loader2,
+  Music,
+  Video,
 } from 'lucide-react'
 import { useAudioPlayer } from '../hooks/useAudioPlayer'
 import { useWaveform } from '../hooks/useWaveform'
@@ -18,6 +20,7 @@ import { isVideo } from '../constants'
 import { usePlayer } from '../hooks/usePlayer'
 import { selectCurrentTrack, useAppStore } from '../store'
 import { useFullscreen } from '../hooks/useFullscreen'
+import { useCoverArt } from '../hooks/useCoverArt'
 
 const MIN_HEIGHT = 160
 
@@ -46,6 +49,7 @@ export function PlayerBar() {
 
   const displayName = track?.name.replace(/\.[^/.]+$/, '') ?? 'No track selected'
   const trackIsVideo = track ? isVideo(track.ext) : false
+  const cover = useCoverArt(track)
 
   useEffect(() => {
     const path = track?.source === 'local' ? track.path : null
@@ -79,6 +83,7 @@ export function PlayerBar() {
 
         {/* top row — track info + controls */}
         <div className="flex items-center px-6 pt-3 pb-2 gap-4">
+          <Cover src={cover} video={trackIsVideo} />
           <div className="flex flex-col min-w-0 flex-1">
             <span className="text-sm font-mono text-app-accent truncate">{displayName}</span>
             <span className="text-xs font-mono text-app-muted tabular-nums">
@@ -162,5 +167,19 @@ export function PlayerBar() {
         </div>
       </div>
     </>
+  )
+}
+
+function Cover({ src, video }: { src: string | null; video: boolean }) {
+  return (
+    <div className="w-11 h-11 shrink-0 rounded overflow-hidden bg-app-skeleton flex items-center justify-center text-app-muted">
+      {src ? (
+        <img src={src} alt="" className="w-full h-full object-cover" />
+      ) : video ? (
+        <Video size={18} />
+      ) : (
+        <Music size={18} />
+      )}
+    </div>
   )
 }

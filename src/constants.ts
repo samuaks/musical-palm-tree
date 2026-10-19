@@ -1,5 +1,5 @@
 export const VIDEO_EXTS = ['mp4', 'mkv', 'webm', 'avi', 'mov']
-export const AUDIO_EXTS = ['mp3', 'flac', 'wav', 'aac', 'ogg']
+export const AUDIO_EXTS = ['mp3', 'flac', 'wav', 'aac', 'ogg', 'm4a']
 
 export function isVideo(ext: string): boolean {
   return VIDEO_EXTS.includes(ext.toLowerCase())

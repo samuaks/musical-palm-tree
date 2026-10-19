@@ -4,7 +4,6 @@ export interface MediaFile {
   ext: string
   duration_secs: number
   size_bytes: number
-  art_path: string | null
   created_at: number
 }
 

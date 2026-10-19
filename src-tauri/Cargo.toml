@@ -31,6 +31,8 @@ lofty = "0.21"
 tauri-plugin-shell = "2"
 reqwest = { version = "0.13", default-features = false, features = ["native-tls", "system-proxy"] }
 sha2 = "0.10"
+base64 = "0.22"
+image = { version = "0.25", default-features = false, features = ["jpeg", "png"] }
 
 [dev-dependencies]
 tempfile = "3"

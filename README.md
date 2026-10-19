@@ -15,7 +15,7 @@ terminal player, and is meant as a learning-friendly codebase (the repository is
 **Local library**
 
 - On startup, scans `~/Downloads`, `~/Music`, `~/Videos`, `~/Desktop` and `~/Documents`, up to three
-  folder levels deep, for audio (mp3, flac, wav, aac, ogg) and video (mp4, mkv, webm, avi, mov).
+  folder levels deep, for audio (mp3, flac, wav, aac, ogg, m4a) and video (mp4, mkv, webm, avi, mov).
 - Groups files by top-level folder, then album (the first subfolder). The library fills in while
   the scan is still running.
 - Fuzzy search across file, album and folder names.
@@ -27,6 +27,9 @@ terminal player, and is meant as a learning-friendly codebase (the repository is
 
 - Plays audio and video. Next/previous follow the library order, and the next track starts when one
   ends.
+- Cover art for the current track: the picture embedded in the file (mp3, flac, ogg, m4a), or else a
+  `cover`, `folder`, `front` or `album` image (jpg/png) in the track's folder. YouTube thumbnails for
+  online tracks.
 - Waveform overview in the player bar: click to seek, hover to preview the position. It's built in
   Rust from the first 60 seconds of the track. Until it's ready, and for tracks that have none
   (online streams, unsupported codecs), a plain progress line does the same job.
@@ -70,7 +73,6 @@ These work while nothing else has keyboard focus (click an empty area after usin
   use different web engines (WebView2, WKWebView), so this is specific to Linux.
 - The scanned folders are fixed, and the library is only scanned at startup.
 - Tracks within an album are listed in filesystem order, not sorted by name.
-- Cover art is extracted and cached by the scanner but not shown in the UI yet.
 - Duplicates are only counted; there's no view of which files they are.
 - The waveform reflects the first 60 seconds of a track, stretched across the whole track.
 - Online streams are audio-only.
@@ -81,12 +83,12 @@ Playback uses the platform's web engine (WebView2 on Windows, WKWebView on macOS
 Linux), so which formats and codecs actually play depends on the platform. Waveforms are generated
 in Rust with [symphonia](https://github.com/pdeljanov/Symphonia):
 
-| Format                            | Waveform                                                         |
-| --------------------------------- | ---------------------------------------------------------------- |
-| mp3, flac, wav, aac, ogg (Vorbis) | ✅                                                               |
-| mp4, mov                          | ✅ (AAC audio)                                                   |
-| mkv, webm                         | ✅ with AAC, Vorbis or FLAC audio; ❌ with Opus (common in webm) |
-| avi                               | ❌                                                               |
+| Format                                 | Waveform                                                         |
+| -------------------------------------- | ---------------------------------------------------------------- |
+| mp3, flac, wav, aac, ogg (Vorbis), m4a | ✅                                                               |
+| mp4, mov                               | ✅ (AAC audio)                                                   |
+| mkv, webm                              | ✅ with AAC, Vorbis or FLAC audio; ❌ with Opus (common in webm) |
+| avi                                    | ❌                                                               |
 
 ## Getting started
 
@@ -139,7 +141,7 @@ work happens on `main`; don't commit directly to `release`.
 ## How it's built
 
 React owns the UI and state (Zustand), Tauri IPC connects it to Rust, and Rust does the heavy
-filesystem and media work: scanning, hashing, cover-art extraction, waveform decoding, and managing
+filesystem and media work: scanning, hashing, cover-art thumbnails, waveform decoding, and managing
 yt-dlp. Waveforms are generated in Rust because the browser's `decodeAudioData` decodes a whole file
 into memory first (about 800 MB for a 38-minute stereo track), which crashed the WebView on long
 files.
@@ -160,7 +162,7 @@ screenshots for UI changes, and say how you verified it.
 | Item                                           | Status      |
 | ---------------------------------------------- | ----------- |
 | Custom scan folders via a settings UI          | Planned     |
-| Show cover art in the library and player       | Planned     |
+| Show cover art in the library too              | Planned     |
 | Autocomplete dropdown with keyboard navigation | Planned     |
 | Playlists                                      | Planned     |
 | Shuffle / loop modes                           | Planned     |

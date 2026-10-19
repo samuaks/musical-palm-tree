@@ -164,6 +164,7 @@ App.tsx
 
 lib.rs ← entry, registers commands, runs Tauri
 scanner.rs ← scan_media command, walks filesystem with rayon
+art.rs ← cover_art command, embedded/folder cover thumbnails on demand
 waveform.rs ← generate_waveform command, decodes via symphonia
 online.rs ← search_online / resolve_stream commands
 ytdlp.rs ← yt_dlp_status / install_yt_dlp, finds/updates/runs yt-dlp
@@ -174,6 +175,7 @@ ytdlp.rs ← yt_dlp_status / install_yt_dlp, finds/updates/runs yt-dlp
 | ------------------- | ------------------------------------------ | ---------- |
 | `scan_media`        | Recursive scan, emits progress events      | async      |
 | `generate_waveform` | Decode + downsample first 60s for waveform | async      |
+| `cover_art`         | Cover thumbnail for one track, as data URL | async      |
 | `search_online`     | yt-dlp `ytsearch10:` flat search           | async      |
 | `resolve_stream`    | yt-dlp lookup of a playable stream URL     | async      |
 | `yt_dlp_status`     | Whether yt-dlp is found / installable      | sync       |
@@ -183,19 +185,30 @@ ytdlp.rs ← yt_dlp_status / install_yt_dlp, finds/updates/runs yt-dlp
 
 1. **Walk** (parallel per allowed dir) — `WalkDir` over `Downloads`, `Music`,
    `Videos`, `Desktop`, `Documents` (3 levels deep) collects media file entries
-2. **Process** (parallel via `rayon`) — chunked metadata reading, partial hash, cover art
+2. **Process** (parallel via `rayon`) — chunked metadata reading and partial hash
 3. **Merge** (single-threaded, walk order) — build directory tree, dedup, emit progress
 
 The scan runs on a blocking thread (`spawn_blocking`). `app.emit('scan_count', count)`
 fires after every chunk; `app.emit('scan_progress', dirs)` sends a tree snapshot at
 most every 250 ms.
 
-### Album Art Caching
+### Cover Art (`art.rs`)
 
-- Extracted via `lofty` from audio file tags
-- Cached to OS app cache dir: `app_cache_dir/art_{hash}.jpg`
-- Files without art get an empty `art_{hash}.none` marker so they aren't re-parsed every scan
-- File path returned to frontend, rendered via `convertFileSrc`
+Shown in the player bar for the current track, so it's produced on demand rather than during
+the scan. `useCoverArt` calls `cover_art(path)` when a local track becomes current (online
+tracks use their YouTube thumbnail URL) and keeps up to 200 results in memory.
+
+- **Embedded picture** via `lofty` (front cover preferred, else the first picture). Works for
+  ID3 (mp3), FLAC PICTURE blocks, Ogg `METADATA_BLOCK_PICTURE` and MP4 `covr` (m4a).
+- **Folder image** fallback: `cover`, `folder`, `front` or `album` + `.jpg`/`.jpeg`/`.png` in
+  the track's folder, case-insensitive.
+- **Thumbnails**: downscaled to fit 256×256 and stored as JPEG with the `image` crate; formats
+  it can't decode (WebP, GIF) are kept as-is.
+- **Cache** in `app_cache_dir`: `cover_<partial hash>.jpg` per file, an empty
+  `cover_<hash>.none` when there's no embedded art (folder images are still checked each time,
+  so adding one later works), and `cover_dir_<md5(path, size, mtime)>.jpg` for folder images.
+  Old `art_*` files from earlier versions are deleted at startup.
+- Returned as a `data:` URL, so the WebView needs no asset-protocol access for art.
 
 ### Waveform Generation
 
@@ -288,7 +301,7 @@ Stored in localStorage:
 - `playmusic-playerbar-height` — last drag-resized player bar height
 - `playmusic-videopane-width` — last drag-resized video pane width
 
-Album art cache stored in OS app cache dir (cleared if the app is uninstalled).
+Cover thumbnails are cached in the OS app cache dir (cleared if the app is uninstalled).
 
 ## Constants & Utilities
 
