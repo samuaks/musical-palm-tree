@@ -201,6 +201,21 @@ most every 250 ms.
 - Downsampled to 100 normalized `f32` values
 - Returned to frontend as `{ samples: number[] }`
 
+### Optional yt-dlp
+
+yt-dlp is an optional runtime dependency, not a required Tauri sidecar, so the app builds and
+runs without it (local-only).
+
+- `online.rs` looks it up per call: the dev sidecar path `src-tauri/binaries/yt-dlp-<triple>`
+  (debug builds only), then next to the app executable (where a bundled sidecar is installed),
+  then `PATH`, then `/opt/homebrew/bin`, `/usr/local/bin` and `~/.local/bin` (GUI launches on
+  macOS don't inherit the shell's `PATH`). It runs it through `tauri-plugin-shell`'s Rust API.
+- `online_available` reports whether it was found. `useOnlineAvailability` calls it once at
+  startup; when it's missing, spaces flagged `requiresOnline` are hidden (`useSpaces`) and the
+  active space falls back to Local.
+- `src-tauri/tauri.bundle-yt-dlp.conf.json` adds it back as `externalBin` for installers that
+  should ship it: `bun run tauri build --config src-tauri/tauri.bundle-yt-dlp.conf.json`.
+
 ## Custom Hooks (`src/hooks/`)
 
 | Hook             | Purpose                                                      |

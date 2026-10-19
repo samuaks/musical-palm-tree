@@ -10,6 +10,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             scanner::scan_media,
             waveform::generate_waveform,
+            online::online_available,
             online::search_online,
             online::resolve_stream,
         ])

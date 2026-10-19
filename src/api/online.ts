@@ -2,6 +2,11 @@
 import { invoke } from '@tauri-apps/api/core'
 import { OnlineSearchResult, OnlineTrack } from '../types'
 
+/** Whether yt-dlp is installed. Without it the app runs local-only. */
+export async function onlineAvailable(): Promise<boolean> {
+  return invoke<boolean>('online_available')
+}
+
 export async function searchOnline(query: string): Promise<OnlineSearchResult[]> {
   const trimmed = query.trim()
   if (!trimmed) return []

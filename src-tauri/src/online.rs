@@ -1,5 +1,9 @@
 use serde::{Deserialize, Serialize};
+use std::path::{Path, PathBuf};
 use tauri_plugin_shell::ShellExt;
+
+const NOT_FOUND: &str = "yt-dlp not found: install it and make sure it's on PATH, \
+     or place it next to the playmusic executable";
 
 #[derive(Debug, Serialize)]
 pub struct OnlineSearchResult {
@@ -27,6 +31,53 @@ struct YtDlpThumbnail {
     width: Option<u32>,
 }
 
+/// Whether the Online space can work, i.e. yt-dlp is installed. The frontend hides the
+/// space when it isn't, so the app runs local-only without it.
+#[tauri::command]
+pub fn online_available() -> bool {
+    yt_dlp().is_some()
+}
+
+/// yt-dlp is optional and looked up at runtime instead of being a required Tauri sidecar.
+/// The lookup is a few `stat` calls, so it isn't cached.
+fn yt_dlp() -> Option<PathBuf> {
+    // Builds made with `--config tauri.bundle-yt-dlp.conf.json` ship it next to the exe.
+    let exe_dir = std::env::current_exe()
+        .ok()
+        .and_then(|exe| exe.parent().map(Path::to_path_buf));
+    // Dev builds also accept the old sidecar location, so existing setups keep working.
+    let dev_sidecar = cfg!(debug_assertions).then(|| {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("binaries")
+            .join(format!(
+                "yt-dlp-{}{}",
+                env!("TAURI_ENV_TARGET_TRIPLE"),
+                std::env::consts::EXE_SUFFIX
+            ))
+    });
+    let path_dirs = std::env::var_os("PATH")
+        .map(|p| std::env::split_paths(&p).collect::<Vec<_>>())
+        .unwrap_or_default();
+    // Apps launched from Finder/Dock (macOS) or some Linux desktops don't get the shell's PATH,
+    // so also try where Homebrew and pipx install it.
+    let common_dirs = ["/opt/homebrew/bin", "/usr/local/bin"]
+        .map(PathBuf::from)
+        .into_iter()
+        .chain(dirs::home_dir().map(|home| home.join(".local").join("bin")));
+
+    dev_sidecar
+        .filter(|p| p.is_file())
+        .or_else(|| find_yt_dlp(exe_dir.into_iter().chain(path_dirs).chain(common_dirs)))
+}
+
+/// The first `yt-dlp` executable found in `dirs`, in order.
+fn find_yt_dlp(dirs: impl IntoIterator<Item = PathBuf>) -> Option<PathBuf> {
+    let name = format!("yt-dlp{}", std::env::consts::EXE_SUFFIX);
+    dirs.into_iter()
+        .map(|dir| dir.join(&name))
+        .find(|p| p.is_file())
+}
+
 #[tauri::command]
 pub async fn search_online(
     app: tauri::AppHandle,
@@ -40,8 +91,7 @@ pub async fn search_online(
 
     let output = app
         .shell()
-        .sidecar("yt-dlp")
-        .map_err(|e| format!("failed to create sidecar: {e}"))?
+        .command(yt_dlp().ok_or(NOT_FOUND)?)
         .args([
             "--dump-json",
             "--flat-playlist",
@@ -76,16 +126,12 @@ pub async fn search_online(
 }
 
 #[tauri::command]
-pub async fn resolve_stream(
-    app: tauri::AppHandle,
-    video_id: String,
-) -> Result<String, String> {
+pub async fn resolve_stream(app: tauri::AppHandle, video_id: String) -> Result<String, String> {
     let url = format!("https://www.youtube.com/watch?v={video_id}");
 
     let output = app
         .shell()
-        .sidecar("yt-dlp")
-        .map_err(|e| format!("failed to create sidecar: {e}"))?
+        .command(yt_dlp().ok_or(NOT_FOUND)?)
         .args([
             "-f",
             "bestaudio",
@@ -125,4 +171,43 @@ fn pick_thumbnail(thumbnails: Option<Vec<YtDlpThumbnail>>) -> Option<String> {
         None => (1u8, 0),
     });
     thumbs.into_iter().next().map(|t| t.url)
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::TempDir;
+
+    fn exe_name() -> String {
+        format!("yt-dlp{}", std::env::consts::EXE_SUFFIX)
+    }
+
+    #[test]
+    fn finds_yt_dlp_in_the_first_dir_that_has_it() {
+        let empty = TempDir::new().unwrap();
+        let first = TempDir::new().unwrap();
+        let second = TempDir::new().unwrap();
+        std::fs::write(first.path().join(exe_name()), b"").unwrap();
+        std::fs::write(second.path().join(exe_name()), b"").unwrap();
+
+        let dirs = [empty.path(), first.path(), second.path()].map(Path::to_path_buf);
+        assert_eq!(find_yt_dlp(dirs), Some(first.path().join(exe_name())));
+    }
+
+    #[test]
+    fn missing_yt_dlp_is_none() {
+        let empty = TempDir::new().unwrap();
+        let dirs = [
+            empty.path().to_path_buf(),
+            empty.path().join("does-not-exist"),
+        ];
+        assert_eq!(find_yt_dlp(dirs), None);
+        assert_eq!(find_yt_dlp(Vec::new()), None);
+    }
+
+    #[test]
+    fn a_directory_named_yt_dlp_is_not_a_match() {
+        let dir = TempDir::new().unwrap();
+        std::fs::create_dir(dir.path().join(exe_name())).unwrap();
+        assert_eq!(find_yt_dlp([dir.path().to_path_buf()]), None);
+    }
 }

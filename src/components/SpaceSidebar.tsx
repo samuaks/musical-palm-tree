@@ -1,13 +1,14 @@
-import { SPACES } from '../spaces'
+import { useSpaces } from '../spaces'
 import { useAppStore } from '../store'
 
 export function SpaceSidebar() {
   const activeSpaceId = useAppStore((s) => s.activeSpaceId)
   const setActiveSpaceId = useAppStore((s) => s.setActiveSpaceId)
+  const spaces = useSpaces()
 
   return (
     <div className="w-14 shrink-0 flex flex-col items-center gap-2 py-3 border-r border-app-border">
-      {SPACES.map((space) => {
+      {spaces.map((space) => {
         const isActive = activeSpaceId === space.id
         return (
           <button

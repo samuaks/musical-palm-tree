@@ -125,6 +125,20 @@ When bringing work back, prefer small pull requests with a clear explanation, sc
 - click waveform — seek to position
 - click track — play immediately
 
+## Online space (optional)
+
+The Online space (YouTube search and streaming) uses [yt-dlp](https://github.com/yt-dlp/yt-dlp).
+You don't need it to build or run the app: without it the Online space is hidden and the app is
+local-only. To enable it, either:
+
+- install yt-dlp so it's on your `PATH` (e.g. `winget install yt-dlp.yt-dlp`, `brew install yt-dlp`,
+  `pipx install yt-dlp`), or
+- bundle it into the installer: put the binary at `src-tauri/binaries/yt-dlp-<target-triple>` and build
+  with `bun run tauri build --config src-tauri/tauri.bundle-yt-dlp.conf.json`.
+
+Dev builds also use `src-tauri/binaries/yt-dlp-<target-triple>` if it's there. The app checks for
+yt-dlp at startup, so restart it after installing.
+
 ## Requirements
 
 - Bun 1.1+

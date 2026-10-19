@@ -49,6 +49,9 @@ interface AppState {
   playing: boolean
   resolving: boolean
 
+  // null until checked; false when yt-dlp isn't installed, which hides the Online space
+  onlineAvailable: boolean | null
+
   // theme
   theme: Theme
 
@@ -56,6 +59,7 @@ interface AppState {
   setActiveSpaceId: (id: string) => void
   setPlaying: (playing: boolean) => void
   setResolving: (resolving: boolean) => void
+  setOnlineAvailable: (available: boolean) => void
   setTheme: (theme: Theme) => void
 
   // queue actions
@@ -87,6 +91,7 @@ export const useAppStore = create<AppState>((set) => ({
   queueIndex: -1,
   playing: false,
   resolving: false,
+  onlineAvailable: null,
   theme:
     (typeof window !== 'undefined' && (localStorage.getItem('playmusic-theme') as Theme)) || 'dark',
 
@@ -122,6 +127,13 @@ export const useAppStore = create<AppState>((set) => ({
     }),
   setPlaying: (playing) => set({ playing }),
   setResolving: (resolving) => set({ resolving }),
+  setOnlineAvailable: (onlineAvailable) =>
+    set((s) =>
+      // Fall back to Local without persisting it, so Online comes back once yt-dlp is installed.
+      !onlineAvailable && s.activeSpaceId === 'online'
+        ? { onlineAvailable, activeSpaceId: 'local' }
+        : { onlineAvailable }
+    ),
   setTheme: (theme) => {
     localStorage.setItem('playmusic-theme', theme)
     document.documentElement.dataset.theme = theme
