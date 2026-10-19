@@ -4,6 +4,7 @@ import { LocalSpace } from './LocalSpace'
 import { OnlineSpace } from './OnlineSpace'
 import { LocalSpaceHeader } from './LocalSpaceHeader'
 import { OnlineSpaceHeader } from './OnlineSpaceHeader'
+import { useAppStore } from '../store'
 
 export interface Space {
   id: string
@@ -11,6 +12,7 @@ export interface Space {
   icon: ReactNode
   Component: () => JSX.Element
   Header: () => JSX.Element
+  requiresOnline?: boolean // hidden when yt-dlp isn't installed
 }
 
 export const SPACES: Space[] = [
@@ -27,5 +29,12 @@ export const SPACES: Space[] = [
     icon: <Globe size={20} />,
     Component: OnlineSpace,
     Header: OnlineSpaceHeader,
+    requiresOnline: true,
   },
 ]
+
+/** Spaces that can be shown. Online ones stay visible until the yt-dlp check says otherwise. */
+export function useSpaces(): Space[] {
+  const onlineAvailable = useAppStore((s) => s.onlineAvailable)
+  return SPACES.filter((space) => !space.requiresOnline || onlineAvailable !== false)
+}
