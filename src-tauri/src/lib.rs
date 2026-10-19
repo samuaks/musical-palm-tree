@@ -1,3 +1,4 @@
+mod art;
 mod online;
 mod scanner;
 mod waveform;
@@ -10,11 +11,14 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .setup(|app| {
             tauri::async_runtime::spawn(ytdlp::auto_update(app.handle().clone()));
+            let handle = app.handle().clone();
+            tauri::async_runtime::spawn_blocking(move || art::remove_legacy_cache(&handle));
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
             scanner::scan_media,
             waveform::generate_waveform,
+            art::cover_art,
             ytdlp::yt_dlp_status,
             ytdlp::install_yt_dlp,
             online::search_online,
