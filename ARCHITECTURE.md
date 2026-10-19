@@ -171,17 +171,20 @@ waveform.rs ← generate_waveform command, decodes via symphonia
 
 ### Scan Pipeline (3-phase, parallelized)
 
-1. **Walk** (single-threaded) — `WalkDir` collects valid media file entries
-2. **Process** (parallel via `rayon`) — chunked metadata reading + partial hash
-3. **Merge** (single-threaded) — build directory tree, dedup, emit progress
+1. **Walk** (parallel per allowed dir) — `WalkDir` over `Downloads`, `Music`,
+   `Videos`, `Desktop`, `Documents` (3 levels deep) collects media file entries
+2. **Process** (parallel via `rayon`) — chunked metadata reading, partial hash, cover art
+3. **Merge** (single-threaded, walk order) — build directory tree, dedup, emit progress
 
-Progress is emitted between chunks via `app.emit('scan_progress', dirs)` and
-`app.emit('scan_count', count)`.
+The scan runs on a blocking thread (`spawn_blocking`). `app.emit('scan_count', count)`
+fires after every chunk; `app.emit('scan_progress', dirs)` sends a tree snapshot at
+most every 250 ms.
 
 ### Album Art Caching
 
 - Extracted via `lofty` from audio file tags
 - Cached to OS app cache dir: `app_cache_dir/art_{hash}.jpg`
+- Files without art get an empty `art_{hash}.none` marker so they aren't re-parsed every scan
 - File path returned to frontend, rendered via `convertFileSrc`
 
 ### Waveform Generation
