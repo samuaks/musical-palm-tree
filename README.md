@@ -91,6 +91,14 @@ bun run tauri build
 
 Produces platform-native installers in `src-tauri/target/release/bundle/`.
 
+Tests (Rust unit tests):
+```bash
+cd src-tauri
+cargo test
+```
+`tauri-build` needs `src-tauri/binaries/yt-dlp-<target-triple>` and a `dist/` folder to exist
+before any `cargo` command; see `CLAUDE.md` for details.
+
 ## Learning and Forks
 
 This project is designed to be useful as a learning open-source codebase. Forks are welcome as a normal way to explore ideas before they are ready for a focused pull request.
