@@ -1,4 +1,5 @@
 use rayon::prelude::*;
+use std::cmp::Ordering;
 use std::collections::{BTreeMap, HashMap};
 use std::fs::File;
 use std::io::{Read, Seek, SeekFrom};
@@ -108,18 +109,22 @@ impl Library {
     fn directories(&self, home: &Path) -> Vec<Directory> {
         self.groups
             .iter()
-            .map(|(top, g)| Directory {
-                name: top.to_string(),
-                path: home.join(top).to_string_lossy().into_owned(),
-                albums: g
+            .map(|(top, g)| {
+                let mut albums: Vec<Album> = g
                     .albums
                     .iter()
                     .map(|(name, files)| Album {
                         name: name.clone(),
-                        files: files.clone(),
+                        files: sorted_by_name(files),
                     })
-                    .collect(),
-                files: g.files.clone(),
+                    .collect();
+                albums.sort_by(|a, b| natural_cmp(&a.name, &b.name));
+                Directory {
+                    name: top.to_string(),
+                    path: home.join(top).to_string_lossy().into_owned(),
+                    albums,
+                    files: sorted_by_name(&g.files),
+                }
             })
             .collect()
     }
@@ -128,6 +133,47 @@ impl Library {
     fn into_duplicates(self) -> Vec<Vec<String>> {
         self.seen.into_values().filter(|p| p.len() > 1).collect()
     }
+}
+
+/// Files are added in filesystem order, which is arbitrary; list them by name instead.
+fn sorted_by_name(files: &[MediaFile]) -> Vec<MediaFile> {
+    let mut files = files.to_vec();
+    files.sort_by(|a, b| natural_cmp(&a.name, &b.name));
+    files
+}
+
+/// Orders names the way people expect: case-insensitive, with runs of digits compared as
+/// numbers, so "2 Intro" comes before "10 Outro". Exact ties fall back to byte order.
+fn natural_cmp(a: &str, b: &str) -> Ordering {
+    let (mut x, mut y) = (a.chars().peekable(), b.chars().peekable());
+    loop {
+        let ord = match (x.peek().copied(), y.peek().copied()) {
+            (None, None) => return a.cmp(b),
+            (None, Some(_)) => return Ordering::Less,
+            (Some(_), None) => return Ordering::Greater,
+            (Some(c), Some(d)) if c.is_ascii_digit() && d.is_ascii_digit() => {
+                let (n, m) = (take_digits(&mut x), take_digits(&mut y));
+                let (n, m) = (n.trim_start_matches('0'), m.trim_start_matches('0'));
+                n.len().cmp(&m.len()).then_with(|| n.cmp(m))
+            }
+            (Some(c), Some(d)) => {
+                x.next();
+                y.next();
+                c.to_lowercase().cmp(d.to_lowercase())
+            }
+        };
+        if ord != Ordering::Equal {
+            return ord;
+        }
+    }
+}
+
+fn take_digits(chars: &mut std::iter::Peekable<std::str::Chars>) -> String {
+    let mut digits = String::new();
+    while let Some(c) = chars.next_if(char::is_ascii_digit) {
+        digits.push(c);
+    }
+    digits
 }
 
 #[tauri::command]
@@ -502,6 +548,80 @@ mod tests {
         assert_eq!(dirs[0].files[0].name, "loose.mp3");
         assert_eq!(dirs[1].files.len(), 1);
         assert_eq!(lib.total_files, 4);
+    }
+
+    #[test]
+    fn library_lists_tracks_by_name_not_walk_order() {
+        let mut lib = Library::default();
+        for name in [
+            "10 Outro.mp3",
+            "02 Second.mp3",
+            "1 First.mp3",
+            "bonus.mp3",
+            "Acoustic.mp3",
+        ] {
+            let path = format!("/h/Music/Album/{name}");
+            lib.add(processed(&path, "Music", Some("Album"), None));
+        }
+        for name in ["zz.mp3", "Aa.mp3"] {
+            lib.add(processed(&format!("/h/Music/{name}"), "Music", None, None));
+        }
+        for album in ["Vol 10", "vol 2"] {
+            let path = format!("/h/Music/{album}/a.mp3");
+            lib.add(processed(&path, "Music", Some(album), None));
+        }
+
+        let dirs = lib.directories(Path::new("/h"));
+        let names = |files: &[MediaFile]| files.iter().map(|f| f.name.clone()).collect::<Vec<_>>();
+        assert_eq!(
+            names(&dirs[0].albums[0].files),
+            [
+                "1 First.mp3",
+                "02 Second.mp3",
+                "10 Outro.mp3",
+                "Acoustic.mp3",
+                "bonus.mp3"
+            ]
+        );
+        assert_eq!(names(&dirs[0].files), ["Aa.mp3", "zz.mp3"]);
+        let albums: Vec<_> = dirs[0].albums.iter().map(|a| a.name.as_str()).collect();
+        assert_eq!(
+            albums,
+            ["Album", "vol 2", "Vol 10"],
+            "albums in natural order too"
+        );
+    }
+
+    #[test]
+    fn natural_order_compares_numbers_and_ignores_case() {
+        let mut names = vec![
+            "Track 10",
+            "track 2",
+            "Track 1",
+            "Track 02b",
+            "Track",
+            "Disc 2 - 01",
+            "Disc 10 - 01",
+            "disc 2 - 10",
+        ];
+        names.sort_by(|a, b| natural_cmp(a, b));
+        assert_eq!(
+            names,
+            [
+                "Disc 2 - 01",
+                "disc 2 - 10",
+                "Disc 10 - 01",
+                "Track",
+                "Track 1",
+                "track 2",
+                "Track 02b",
+                "Track 10"
+            ]
+        );
+        // Exact ties are still ordered, so sorting is deterministic.
+        assert_eq!(natural_cmp("01 a", "1 a"), Ordering::Less);
+        assert_eq!(natural_cmp("A", "a"), Ordering::Less);
+        assert_eq!(natural_cmp("same", "same"), Ordering::Equal);
     }
 
     #[test]

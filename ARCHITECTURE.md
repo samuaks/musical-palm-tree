@@ -186,7 +186,9 @@ ytdlp.rs ← yt_dlp_status / install_yt_dlp, finds/updates/runs yt-dlp
 1. **Walk** (parallel per allowed dir) — `WalkDir` over `Downloads`, `Music`,
    `Videos`, `Desktop`, `Documents` (3 levels deep) collects media file entries
 2. **Process** (parallel via `rayon`) — chunked metadata reading and partial hash
-3. **Merge** (single-threaded, walk order) — build directory tree, dedup, emit progress
+3. **Merge** (single-threaded, walk order) — build directory tree, dedup, emit progress.
+   Albums and their tracks are listed in natural name order (`2 …` before `10 …`, case-insensitive);
+   walk order only decides which copy of a duplicate is kept
 
 The scan runs on a blocking thread (`spawn_blocking`). `app.emit('scan_count', count)`
 fires after every chunk; `app.emit('scan_progress', dirs)` sends a tree snapshot at
