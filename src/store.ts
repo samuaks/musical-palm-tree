@@ -6,6 +6,7 @@ import {
   Track,
   OnlineSearchResult,
   OnlineSearchState,
+  YtDlpStatus,
 } from './types'
 
 type Theme = 'dark' | 'light'
@@ -49,8 +50,8 @@ interface AppState {
   playing: boolean
   resolving: boolean
 
-  // null until checked; false when yt-dlp isn't installed, which hides the Online space
-  onlineAvailable: boolean | null
+  // null until checked at startup
+  ytDlp: YtDlpStatus | null
 
   // theme
   theme: Theme
@@ -59,7 +60,7 @@ interface AppState {
   setActiveSpaceId: (id: string) => void
   setPlaying: (playing: boolean) => void
   setResolving: (resolving: boolean) => void
-  setOnlineAvailable: (available: boolean) => void
+  setYtDlp: (status: YtDlpStatus) => void
   setTheme: (theme: Theme) => void
 
   // queue actions
@@ -91,7 +92,7 @@ export const useAppStore = create<AppState>((set) => ({
   queueIndex: -1,
   playing: false,
   resolving: false,
-  onlineAvailable: null,
+  ytDlp: null,
   theme:
     (typeof window !== 'undefined' && (localStorage.getItem('playmusic-theme') as Theme)) || 'dark',
 
@@ -127,12 +128,12 @@ export const useAppStore = create<AppState>((set) => ({
     }),
   setPlaying: (playing) => set({ playing }),
   setResolving: (resolving) => set({ resolving }),
-  setOnlineAvailable: (onlineAvailable) =>
+  setYtDlp: (ytDlp) =>
     set((s) =>
-      // Fall back to Local without persisting it, so Online comes back once yt-dlp is installed.
-      !onlineAvailable && s.activeSpaceId === 'online'
-        ? { onlineAvailable, activeSpaceId: 'local' }
-        : { onlineAvailable }
+      // Start on Local when Online can't work yet; not persisted, so Online is remembered.
+      s.ytDlp === null && !ytDlp.available && s.activeSpaceId === 'online'
+        ? { ytDlp, activeSpaceId: 'local' }
+        : { ytDlp }
     ),
   setTheme: (theme) => {
     localStorage.setItem('playmusic-theme', theme)

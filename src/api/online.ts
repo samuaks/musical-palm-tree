@@ -1,10 +1,15 @@
 // src/api/online.ts
 import { invoke } from '@tauri-apps/api/core'
-import { OnlineSearchResult, OnlineTrack } from '../types'
+import { OnlineSearchResult, OnlineTrack, YtDlpStatus } from '../types'
 
-/** Whether yt-dlp is installed. Without it the app runs local-only. */
-export async function onlineAvailable(): Promise<boolean> {
-  return invoke<boolean>('online_available')
+/** Whether yt-dlp is installed, and whether the app can install it. */
+export async function ytDlpStatus(): Promise<YtDlpStatus> {
+  return invoke<YtDlpStatus>('yt_dlp_status')
+}
+
+/** Downloads and verifies yt-dlp into the app's data dir; emits `yt_dlp_download` progress. */
+export async function installYtDlp(): Promise<void> {
+  return invoke<void>('install_yt_dlp')
 }
 
 export async function searchOnline(query: string): Promise<OnlineSearchResult[]> {

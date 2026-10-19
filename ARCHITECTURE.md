@@ -201,19 +201,32 @@ most every 250 ms.
 - Downsampled to 100 normalized `f32` values
 - Returned to frontend as `{ samples: number[] }`
 
-### Optional yt-dlp
+### Optional yt-dlp (`ytdlp.rs`)
 
 yt-dlp is an optional runtime dependency, not a required Tauri sidecar, so the app builds and
-runs without it (local-only).
+runs without it (local-only). `ytdlp.rs` owns finding, installing, updating and running it;
+`online.rs` only calls `ytdlp::run`.
 
-- `online.rs` looks it up per call: the dev sidecar path `src-tauri/binaries/yt-dlp-<triple>`
-  (debug builds only), then next to the app executable (where a bundled sidecar is installed),
-  then `PATH`, then `/opt/homebrew/bin`, `/usr/local/bin` and `~/.local/bin` (GUI launches on
-  macOS don't inherit the shell's `PATH`). It runs it through `tauri-plugin-shell`'s Rust API.
-- `online_available` reports whether it was found. `useOnlineAvailability` calls it once at
-  startup; when it's missing, spaces flagged `requiresOnline` are hidden (`useSpaces`) and the
-  active space falls back to Local.
-- `src-tauri/tauri.bundle-yt-dlp.conf.json` adds it back as `externalBin` for installers that
+- **Lookup** (per call): the app-managed copy in `app_data_dir/bin/` first, then the dev
+  sidecar path `src-tauri/binaries/yt-dlp-<triple>` (debug builds only), next to the app
+  executable (where a bundled sidecar is installed), `PATH`, and finally `/opt/homebrew/bin`,
+  `/usr/local/bin` and `~/.local/bin` (GUI launches on macOS don't inherit the shell's `PATH`).
+- **Install** (`install_yt_dlp`): resolves the latest release from the
+  `releases/latest/download/SHA2-256SUMS` redirect (no GitHub API, so no rate limit), downloads
+  the platform's standalone asset (`yt-dlp.exe`, `yt-dlp_macos`, `yt-dlp_linux`, ...) from that
+  same release, verifies its SHA-256, and renames it into place. Emits `yt_dlp_download` progress
+  events. `yt-dlp.version` next to the binary records the installed version.
+- **Update**: only the app-managed copy is updated (copies elsewhere belong to the user or a
+  package manager). It's checked at startup if more than a day has passed, and when a command
+  fails (at most hourly), after which the command is retried once. Updating reuses the verified
+  install download rather than `yt-dlp -U`.
+- An `RwLock` keeps updates from replacing the binary while it runs, which Windows doesn't
+  allow.
+- **Frontend**: `yt_dlp_status` returns `{ available, can_install }`. `useOnlineAvailability`
+  calls it at startup. The Online space shows a download panel while yt-dlp is missing; it's
+  hidden only on platforms with no yt-dlp build to download. If Online was the last-used space
+  and yt-dlp is missing, the app starts on Local.
+- `src-tauri/tauri.bundle-yt-dlp.conf.json` adds yt-dlp back as `externalBin` for installers that
   should ship it: `bun run tauri build --config src-tauri/tauri.bundle-yt-dlp.conf.json`.
 
 ## Custom Hooks (`src/hooks/`)

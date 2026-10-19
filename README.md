@@ -128,16 +128,18 @@ When bringing work back, prefer small pull requests with a clear explanation, sc
 ## Online space (optional)
 
 The Online space (YouTube search and streaming) uses [yt-dlp](https://github.com/yt-dlp/yt-dlp).
-You don't need it to build or run the app: without it the Online space is hidden and the app is
-local-only. To enable it, either:
+You don't need it to build or run the app; local files work without it.
 
-- install yt-dlp so it's on your `PATH` (e.g. `winget install yt-dlp.yt-dlp`, `brew install yt-dlp`,
-  `pipx install yt-dlp`), or
-- bundle it into the installer: put the binary at `src-tauri/binaries/yt-dlp-<target-triple>` and build
-  with `bun run tauri build --config src-tauri/tauri.bundle-yt-dlp.conf.json`.
+The easiest way to enable it is in the app: open the Online space and click **download yt-dlp**.
+playmusic downloads the official standalone build for your platform from the latest yt-dlp release,
+checks it against the release's `SHA2-256SUMS`, and stores it in its app data folder (no admin rights
+needed, on Windows, macOS and Linux). It then checks for a new yt-dlp release once a day, and right away
+if a search or stream fails, since YouTube changes regularly break older versions.
 
-Dev builds also use `src-tauri/binaries/yt-dlp-<target-triple>` if it's there. The app checks for
-yt-dlp at startup, so restart it after installing.
+If you already manage yt-dlp yourself (`winget install yt-dlp.yt-dlp`, `brew install yt-dlp`,
+`pipx install yt-dlp`), playmusic finds it on your `PATH` and leaves updating it to you. To ship it
+inside an installer instead, put the binary at `src-tauri/binaries/yt-dlp-<target-triple>` and build with
+`bun run tauri build --config src-tauri/tauri.bundle-yt-dlp.conf.json`.
 
 ## Requirements
 

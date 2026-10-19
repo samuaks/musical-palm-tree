@@ -12,7 +12,7 @@ export interface Space {
   icon: ReactNode
   Component: () => JSX.Element
   Header: () => JSX.Element
-  requiresOnline?: boolean // hidden when yt-dlp isn't installed
+  requiresOnline?: boolean // needs yt-dlp; hidden only where the app can't install it
 }
 
 export const SPACES: Space[] = [
@@ -33,8 +33,12 @@ export const SPACES: Space[] = [
   },
 ]
 
-/** Spaces that can be shown. Online ones stay visible until the yt-dlp check says otherwise. */
+/**
+ * Spaces that can be shown. Online ones stay visible while yt-dlp is missing, since the app
+ * can install it, except on platforms with no yt-dlp build to download.
+ */
 export function useSpaces(): Space[] {
-  const onlineAvailable = useAppStore((s) => s.onlineAvailable)
-  return SPACES.filter((space) => !space.requiresOnline || onlineAvailable !== false)
+  const ytDlp = useAppStore((s) => s.ytDlp)
+  const hideOnline = ytDlp !== null && !ytDlp.available && !ytDlp.can_install
+  return SPACES.filter((space) => !space.requiresOnline || !hideOnline)
 }
