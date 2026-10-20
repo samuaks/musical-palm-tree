@@ -174,7 +174,7 @@ ytdlp.rs ← yt_dlp_status / install_yt_dlp, finds/updates/runs yt-dlp
 | Command             | Purpose                                    | Sync/Async |
 | ------------------- | ------------------------------------------ | ---------- |
 | `scan_media`        | Recursive scan, emits progress events      | async      |
-| `generate_waveform` | Decode + downsample first 60s for waveform | async      |
+| `generate_waveform` | Whole-track loudness overview (cached)     | async      |
 | `cover_art`         | Cover thumbnail for one track, as data URL | async      |
 | `search_online`     | yt-dlp `ytsearch10:` flat search           | async      |
 | `resolve_stream`    | yt-dlp lookup of a playable stream URL     | async      |
@@ -214,14 +214,22 @@ tracks use their YouTube thumbnail URL) and keeps up to 200 results in memory.
 
 ### Waveform Generation
 
-- Reads first 60 seconds of audio frames using `symphonia`
-- Bounded memory regardless of file size — fixes WebView crashes on large files
-- Downsampled to 100 normalized `f32` values
-- Returned to frontend as `{ samples: number[] }`
-- Async command: decoding runs on a blocking worker thread (`spawn_blocking`), so the UI stays
-  responsive while it's generated
-- `useWaveform` ignores results for tracks that are no longer current; `Waveform` shows a plain
-  progress line (same seek/hover behavior) until bars arrive, then fades them in
+- Decodes the **whole track** with `symphonia`, folding samples into 50 ms chunks (mean absolute
+  value) as it goes, so memory stays small for any length (~45k floats for 38 minutes). The JS
+  `decodeAudioData` this replaced loaded whole files as PCM and crashed the WebView.
+- Chunks are averaged down to at most 1024 points, normalized to 0..=1, and returned as
+  `{ samples: number[] }`.
+- Async command on a blocking worker (`spawn_blocking`), so the UI stays responsive. Each call
+  bumps a request counter; a decode checks it every 64 packets and stops once a newer request
+  has started, so skipping tracks doesn't pile up work.
+- Cached as `app_cache_dir/wave_v2_<partial hash>.bin` (little-endian f32s, ~4 KB); bump the
+  version prefix if the algorithm changes. Corrupt cache files are ignored and regenerated.
+- Rough cost in a release build: ~0.7 s for a 4-minute track, ~2.6 s for a 24-minute one. Dev
+  builds compile dependencies with `opt-level = 3` (see `Cargo.toml`) so they're close to that.
+- `useWaveform` ignores results for tracks that are no longer current. `Waveform` shows a plain
+  progress line (same seek/hover behavior) until bars arrive, then fades them in. It measures
+  its width and draws as many 2 px bars (2 px gaps) as fit, resampling the points by taking each
+  group's peak; the playhead is a single bar.
 
 ### Optional yt-dlp (`ytdlp.rs`)
 

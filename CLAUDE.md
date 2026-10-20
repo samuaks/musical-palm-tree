@@ -59,7 +59,7 @@ src-tauri/src/
   lib.rs             registers commands and plugins
   scanner.rs         scan_media: walks ~/{Downloads,Music,Videos,Desktop,Documents}
   art.rs             cover_art: embedded or folder cover → cached thumbnail → data URL
-  waveform.rs        generate_waveform: symphonia decode of the first 60 s → 100 bars
+  waveform.rs        generate_waveform: whole-track symphonia decode → ≤1024 points, cached
   online.rs          search_online / resolve_stream (parse yt-dlp output)
   ytdlp.rs           finds, installs, updates and runs yt-dlp (optional, app-managed)
 ```
@@ -127,7 +127,11 @@ src-tauri/src/
   `cover_<hash>.none` when there's no embedded art. Folder images (`cover.jpg` etc.) are the
   fallback and are never cached as "none". Changing the hash format invalidates the cache.
 - Waveforms are generated in Rust because `AudioContext.decodeAudioData` loads whole files
-  as PCM and crashes the WebView on long tracks. Don't move this back to JS.
+  as PCM and crashes the WebView on long tracks. Don't move this back to JS. The decode streams
+  the whole track in constant memory and is cached as `app_cache_dir/wave_v2_<hash>.bin`;
+  bump the version if the output format or algorithm changes.
+- `Cargo.toml` builds dependencies with `opt-level = 3` in dev: unoptimized symphonia makes a
+  waveform for a long track take minutes in `tauri dev`. Keep that override.
 
 ## Git and PRs
 

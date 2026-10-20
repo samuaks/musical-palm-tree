@@ -36,3 +36,8 @@ image = { version = "0.25", default-features = false, features = ["jpeg", "png"]
 
 [dev-dependencies]
 tempfile = "3"
+
+# Optimize dependencies (symphonia, lofty, image, ...) even in dev builds: decoding a long
+# track for its waveform is ~20x slower unoptimized. The app crate itself stays fast to rebuild.
+[profile.dev.package."*"]
+opt-level = 3
