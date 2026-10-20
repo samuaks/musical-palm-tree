@@ -57,7 +57,7 @@ export function OnlineSpaceHeader() {
       </div>
 
       {/* search row — identical styling to local for visual consistency */}
-      <div className="flex items-center gap-3 px-3 py-2 rounded border border-app-border hover:border-app-accent-dim transition-colors focus-within:border-app-accent">
+      <div className="flex items-center gap-3 px-3 py-2 rounded border border-app-border hover:border-app-accent transition-colors focus-within:border-app-accent">
         <Search size={16} className="text-app-muted shrink-0" />
         <input
           type="text"
@@ -65,6 +65,11 @@ export function OnlineSpaceHeader() {
           onChange={(e) => setQuery(e.target.value)}
           disabled={!ready}
           placeholder={ready ? 'search youtube...' : 'download yt-dlp below to search'}
+          // no autofill, spellcheck or OS text suggestions while typing a search
+          autoComplete="off"
+          autoCorrect="off"
+          autoCapitalize="off"
+          spellCheck={false}
           className="bg-transparent text-app-text text-sm font-mono placeholder-app-muted outline-none flex-1"
         />
       </div>
