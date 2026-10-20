@@ -370,7 +370,7 @@ runs without it (local-only). `ytdlp.rs` owns finding, installing, updating and 
 
 Two themes via CSS variables in `src/App.css` `@theme` block:
 
-- Default `:root` — dark mode (twilight blue gradient + amber accent)
+- Default `:root` — dark mode (low-saturation slate gradient with a hint of violet + amber accent)
 - `[data-theme="light"]` — Mirror's Edge inspired (white + crimson red)
 
 Theme toggled via `useAppStore(s => s.setTheme)`. Setting persists to
