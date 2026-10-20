@@ -43,6 +43,8 @@ terminal player, and is meant as a learning-friendly codebase (the repository is
   [yt-dlp](https://github.com/yt-dlp/yt-dlp): video up to 1080p in the video pane, or audio only
   with the video button in the player bar. Not needed for local files; see
   [Online space](#online-space-optional) below.
+- Download a result's audio (m4a, into `~/Music/YouTube`) or video (mp4, into `~/Videos/YouTube`)
+  from the buttons on its row; it shows up in the Local space right away.
 
 **App**
 
@@ -129,6 +131,11 @@ fails, since YouTube changes regularly break older versions.
   is found on your `PATH` and left for you to update.
 - **To bundle it in your own build**, put the binary at `src-tauri/binaries/yt-dlp-<target-triple>`
   and build with `bun run tauri build --config src-tauri/tauri.bundle-yt-dlp.conf.json`.
+
+Downloads work without anything else, but with [ffmpeg](https://ffmpeg.org) installed
+(`winget install Gyan.FFmpeg`, `brew install ffmpeg`, `apt install ffmpeg`) they're better: video
+up to 1080p instead of 360p, and title, artist and cover art embedded in the files. playmusic finds
+ffmpeg on your `PATH` (or in Homebrew's folders) at startup.
 
 ## Releases
 

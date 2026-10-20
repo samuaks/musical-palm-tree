@@ -136,6 +136,7 @@ Single store at `src/store.ts`. Three categories of state:
 - `spaces.local.collapsed` — `Set<string>` of collapsed album keys
 - `spaces.online.query` / `results` / `searchState` / `searchError` — online search
 - `spaces.online.video` — play online tracks with video (persisted, default on)
+- `spaces.online.downloads` — download status per `videoId:kind` (state, percent, path/error)
 
 ### Selective subscriptions
 
@@ -181,7 +182,8 @@ ytdlp.rs ← yt_dlp_status / install_yt_dlp, finds/updates/runs yt-dlp
 | `cover_art`         | Cover thumbnail for one track, as data URL | async      |
 | `search_online`     | yt-dlp `ytsearch10:` flat search           | async      |
 | `resolve_stream`    | yt-dlp lookup of audio (+ video) URLs      | async      |
-| `yt_dlp_status`     | Whether yt-dlp is found / installable      | sync       |
+| `download_media`    | Download audio/video into the library      | async      |
+| `yt_dlp_status`     | yt-dlp found / installable, ffmpeg found   | sync       |
 | `install_yt_dlp`    | Download + verify yt-dlp into app data dir | async      |
 
 ### Scan Pipeline (3-phase, parallelized)
@@ -253,6 +255,27 @@ usable video stream, it returns audio only.
 - Stream URLs expire after a few hours. An `error` on either element re-resolves both and resumes
   (at most every 10 s).
 
+### Downloads (`download.rs`)
+
+`download_media(video_id, kind)` saves a search result into a scanned folder, so it becomes a
+local track: audio as m4a in `~/Music/YouTube`, video as mp4 in `~/Videos/YouTube` (album
+"YouTube" in the Local space). Files are named `<title> [<id>].<ext>`; an existing file with that
+id is returned without downloading again.
+
+- **ffmpeg is optional** (`ytdlp::locate_ffmpeg`: `PATH`, then Homebrew/pipx dirs). With it:
+  video up to 1080p (avc1 + m4a merged into mp4), and title/artist/cover embedded. Without it:
+  the m4a audio stream as is, or YouTube's 360p stream with picture and sound (format 18).
+- Runs through `ytdlp::run_streaming`, which reads yt-dlp's output line by line. A progress
+  template prints `PROGRESS <downloaded> <total> <estimate>` lines, which become
+  `download_progress { video_id, kind, downloaded, total }` events (≤ 4/s). A video download
+  reports its video and audio parts in turn.
+- The finished file is found by its `[<id>]` name rather than from yt-dlp's printed path, which
+  Windows consoles can mangle for non-ASCII titles.
+- **Frontend**: `DownloadButton`s on each Online result row track their status in
+  `spaces.online.downloads`. When a download lands, `scanLibrary()` (`api/local.ts`) rescans;
+  a call during a scan queues one more. Live `scan_progress` snapshots only fill an empty
+  library, so a rescan doesn't flicker the list.
+
 ### Optional yt-dlp (`ytdlp.rs`)
 
 yt-dlp is an optional runtime dependency, not a required Tauri sidecar, so the app builds and
@@ -280,7 +303,7 @@ runs without it (local-only). `ytdlp.rs` owns finding, installing, updating and 
   the version in use; its mtime is the last check.
 - An `RwLock` keeps updates from replacing the binary while it runs, which Windows doesn't
   allow.
-- **Frontend**: `yt_dlp_status` returns `{ available, can_install }`. `useOnlineAvailability`
+- **Frontend**: `yt_dlp_status` returns `{ available, can_install, ffmpeg }`. `useOnlineAvailability`
   calls it at startup. The Online space shows a download panel while yt-dlp is missing; it's
   hidden only on platforms with no yt-dlp build to download. If Online was the last-used space
   and yt-dlp is missing, the app starts on Local.
@@ -291,7 +314,7 @@ runs without it (local-only). `ytdlp.rs` owns finding, installing, updating and 
 
 | Hook             | Purpose                                                      |
 | ---------------- | ------------------------------------------------------------ |
-| `useScan`        | Mounts scan listeners, invokes `scan_media`, writes to store |
+| `useScan`        | Mounts scan listeners, runs the first `scanLibrary()`        |
 | `useDurations`   | Lazily fills track durations via `<audio>` metadata          |
 | `useAudioPlayer` | Audio/video playback, seek, keyboard shortcuts, stream resolve |
 | `useVideoSync`   | Keeps an online track's muted video in step with its audio   |

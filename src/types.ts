@@ -76,6 +76,31 @@ export interface ResolvedStream {
 export interface YtDlpStatus {
   available: boolean
   can_install: boolean // the app can download yt-dlp itself on this platform
+  ffmpeg: boolean // found: HD video downloads and tagged audio
+}
+
+/** Mirrors `download::Kind` in src-tauri/src/download.rs. */
+export type DownloadKind = 'audio' | 'video'
+
+/** Mirrors `download::Downloaded`. */
+export interface Downloaded {
+  path: string
+  kind: DownloadKind
+}
+
+/** Payload of the `download_progress` event (`download::DownloadProgress`). */
+export interface DownloadProgress {
+  video_id: string
+  kind: DownloadKind
+  downloaded: number
+  total: number | null
+}
+
+export interface DownloadStatus {
+  state: 'downloading' | 'done' | 'error'
+  percent: number | null
+  path?: string
+  error?: string
 }
 
 export interface YtDlpDownloadProgress {

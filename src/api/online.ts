@@ -1,6 +1,13 @@
 // src/api/online.ts
 import { invoke } from '@tauri-apps/api/core'
-import { OnlineSearchResult, OnlineTrack, ResolvedStream, YtDlpStatus } from '../types'
+import {
+  DownloadKind,
+  Downloaded,
+  OnlineSearchResult,
+  OnlineTrack,
+  ResolvedStream,
+  YtDlpStatus,
+} from '../types'
 
 /** Whether yt-dlp is installed, and whether the app can install it. */
 export async function ytDlpStatus(): Promise<YtDlpStatus> {
@@ -21,6 +28,19 @@ export async function searchOnline(query: string): Promise<OnlineSearchResult[]>
 /** Stream URLs for a video: audio, plus a video-only stream when `video` is on and available. */
 export async function resolveStream(videoId: string, video: boolean): Promise<ResolvedStream> {
   return invoke<ResolvedStream>('resolve_stream', { videoId, video })
+}
+
+/**
+ * Downloads a video's audio (m4a, into ~/Music/YouTube) or video (mp4, into ~/Videos/YouTube),
+ * or returns the existing file. Emits `download_progress` events while it runs.
+ */
+export async function downloadMedia(videoId: string, kind: DownloadKind): Promise<Downloaded> {
+  return invoke<Downloaded>('download_media', { videoId, kind })
+}
+
+/** Store key for one download: the same video can be downloaded as audio and as video. */
+export function downloadKey(videoId: string, kind: DownloadKind): string {
+  return `${videoId}:${kind}`
 }
 
 /**

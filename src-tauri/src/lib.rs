@@ -1,4 +1,5 @@
 mod art;
+mod download;
 mod online;
 mod scanner;
 mod waveform;
@@ -23,6 +24,7 @@ pub fn run() {
             ytdlp::install_yt_dlp,
             online::search_online,
             online::resolve_stream,
+            download::download_media,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

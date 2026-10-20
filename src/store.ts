@@ -7,6 +7,7 @@ import {
   OnlineSearchResult,
   OnlineSearchState,
   YtDlpStatus,
+  DownloadStatus,
 } from './types'
 
 type Theme = 'dark' | 'light'
@@ -36,6 +37,7 @@ interface OnlineSpaceState {
   searchState: OnlineSearchState
   searchError: string | null
   video: boolean // play online tracks with picture (persisted)
+  downloads: Record<string, DownloadStatus> // keyed by downloadKey(videoId, kind)
 }
 
 interface AppState {
@@ -89,6 +91,8 @@ interface AppState {
   setOnlineSearchError: (error: string | null) => void
   resetOnlineSearch: () => void
   setOnlineVideo: (video: boolean) => void
+  setDownload: (key: string, status: DownloadStatus) => void
+  setDownloadPercent: (key: string, percent: number | null) => void
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -118,6 +122,7 @@ export const useAppStore = create<AppState>((set) => ({
       searchState: 'idle',
       searchError: null,
       video: loadOnlineVideo(),
+      downloads: {},
     },
   },
 
@@ -223,6 +228,27 @@ export const useAppStore = create<AppState>((set) => ({
     localStorage.setItem(ONLINE_VIDEO_KEY, String(video))
     set((s) => ({ spaces: { ...s.spaces, online: { ...s.spaces.online, video } } }))
   },
+  setDownload: (key, status) =>
+    set((s) => ({
+      spaces: {
+        ...s.spaces,
+        online: { ...s.spaces.online, downloads: { ...s.spaces.online.downloads, [key]: status } },
+      },
+    })),
+  setDownloadPercent: (key, percent) =>
+    set((s) => {
+      const current = s.spaces.online.downloads[key]
+      if (current?.state !== 'downloading') return s
+      return {
+        spaces: {
+          ...s.spaces,
+          online: {
+            ...s.spaces.online,
+            downloads: { ...s.spaces.online.downloads, [key]: { ...current, percent } },
+          },
+        },
+      }
+    }),
 }))
 
 function loadCollapsed(): Set<string> {
