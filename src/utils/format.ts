@@ -8,6 +8,13 @@ export function formatDuration(secs: number): string {
   return `${m}:${s.toString().padStart(2, '0')}`
 }
 
+const compact = new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 })
+
+/** `630 views`, `248.5k views`, `1.2m views`. */
+export function formatViews(n: number): string {
+  return `${compact.format(n).toLowerCase()} ${n === 1 ? 'view' : 'views'}`
+}
+
 /** `1m ago`, `7mo ago`, ...; empty when unknown. */
 export function formatRelative(ms: number): string {
   if (ms === 0) return ''

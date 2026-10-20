@@ -50,8 +50,8 @@ export function PlayerBar() {
 
   const displayName = track ? trackDisplayName(track.name) : 'No track selected'
   const trackIsVideo = useAppStore((s) => s.videoActive)
-  const onlineVideo = useAppStore((s) => s.youtube.video)
-  const setYouTubeVideo = useAppStore((s) => s.setYouTubeVideo)
+  const onlineVideo = useAppStore((s) => s.online.video)
+  const setOnlineVideo = useAppStore((s) => s.setOnlineVideo)
   const cover = useCoverArt(track)
 
   useEffect(() => {
@@ -139,7 +139,7 @@ export function PlayerBar() {
 
           {track?.source === 'online' && (
             <button
-              onClick={() => setYouTubeVideo(!onlineVideo)}
+              onClick={() => setOnlineVideo(!onlineVideo)}
               className={`transition-colors ${
                 onlineVideo ? 'text-app-accent' : 'text-app-muted hover:text-app-text'
               }`}

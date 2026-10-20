@@ -6,6 +6,8 @@ interface TrackRowProps {
   cover: ReactNode
   title: ReactNode
   subtitle: ReactNode
+  /** Shown after the subtitle and never cut off (e.g. `13h ago`); the subtitle shortens first. */
+  subtitleEnd?: string
   duration: string
   /** Buttons on the right (e.g. downloads); clicks on them don't play the row. */
   actions?: ReactNode
@@ -21,6 +23,7 @@ export function TrackRow({
   cover,
   title,
   subtitle,
+  subtitleEnd,
   duration,
   actions,
   dataPath,
@@ -46,7 +49,10 @@ export function TrackRow({
         >
           {title}
         </div>
-        <div className="text-xs font-mono text-app-secondary truncate">{subtitle}</div>
+        <div className="flex text-xs font-mono text-app-secondary">
+          <span className="truncate min-w-0">{subtitle}</span>
+          {subtitleEnd && <span className="shrink-0 whitespace-pre"> · {subtitleEnd}</span>}
+        </div>
       </div>
 
       {actions && (

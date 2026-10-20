@@ -5,6 +5,7 @@ import {
   Downloaded,
   OnlineSearchResult,
   OnlineTrack,
+  Platform,
   ResolvedStream,
   YtDlpStatus,
 } from '../types'
@@ -20,61 +21,84 @@ export async function installYtDlp(): Promise<void> {
   return invoke<void>('install_yt_dlp')
 }
 
-export async function searchOnline(query: string): Promise<OnlineSearchResult[]> {
+/**
+ * YouTube: a text search. Twitch: the query is a channel name, and its recent VODs are listed.
+ * A pasted YouTube or Twitch link opens that video (or channel) on either platform.
+ */
+export async function searchOnline(
+  query: string,
+  platform: Platform
+): Promise<OnlineSearchResult[]> {
   const trimmed = query.trim()
   if (!trimmed) return []
-  return invoke<OnlineSearchResult[]>('search_online', { query: trimmed })
+  return invoke<OnlineSearchResult[]>('search_online', { query: trimmed, platform })
 }
 
 let searchSeq = 0
 
 /**
- * Searches YouTube for `query` and puts the results in the store (`youtube.*`). Runs on Enter,
- * not while typing. A newer search wins over a slower older one.
+ * Searches the selected platform (`online.platform`) for `query` and puts the results in the
+ * store (`online.*`). Runs on Enter, not while typing. A newer search wins over a slower older
+ * one.
  */
-export async function searchYouTube(query: string): Promise<void> {
+export async function searchOnlineNow(query: string): Promise<void> {
   const trimmed = query.trim()
-  const { ytDlp, setYouTubeResults, setYouTubeSearchState, setYouTubeSearchError } =
+  const { ytDlp, online, setOnlineResults, setOnlineSearchState, setOnlineSearchError } =
     useAppStore.getState()
   if (!trimmed || ytDlp?.available === false) return
 
   const seq = ++searchSeq
-  setYouTubeSearchState('searching')
-  setYouTubeSearchError(null)
+  setOnlineSearchState('searching')
+  setOnlineSearchError(null)
   try {
-    const results = await searchOnline(trimmed)
+    const results = await searchOnline(trimmed, online.platform)
     if (seq !== searchSeq) return
-    setYouTubeResults(trimmed, results)
-    setYouTubeSearchState('done')
+    setOnlineResults(trimmed, results)
+    setOnlineSearchState('done')
   } catch (e) {
     if (seq !== searchSeq) return
-    setYouTubeSearchError(typeof e === 'string' ? e : String(e))
-    setYouTubeSearchState('error')
+    setOnlineSearchError(typeof e === 'string' ? e : String(e))
+    setOnlineSearchState('error')
   }
 }
 
-/** Drops the YouTube results, and any search still running. */
-export function clearYouTubeSearch() {
+/** Drops the online results, and any search still running. */
+export function clearOnlineSearch() {
   searchSeq++
-  useAppStore.getState().clearYouTubeSearch()
+  useAppStore.getState().clearOnlineSearch()
 }
 
-/** Stream URLs for a video: audio, plus a video-only stream when `video` is on and available. */
-export async function resolveStream(videoId: string, video: boolean): Promise<ResolvedStream> {
-  return invoke<ResolvedStream>('resolve_stream', { videoId, video })
+/** Switches the ONLINE tab; results (and any search still running) belong to the old one. */
+export function selectPlatform(platform: Platform) {
+  searchSeq++
+  useAppStore.getState().setOnlinePlatform(platform)
+}
+
+/** Stream URLs for a video: audio, plus a picture stream when `video` is on and available. */
+export async function resolveStream(
+  platform: Platform,
+  videoId: string,
+  video: boolean
+): Promise<ResolvedStream> {
+  return invoke<ResolvedStream>('resolve_stream', { platform, videoId, video })
 }
 
 /**
- * Downloads a video's audio (m4a, into ~/Music/YouTube) or video (mp4, into ~/Videos/YouTube),
- * or returns the existing file. Emits `download_progress` events while it runs.
+ * Downloads a video's audio (m4a, into ~/Music/<YouTube|Twitch>) or video (mp4, into
+ * ~/Videos/<YouTube|Twitch>), or returns the existing file. Emits `download_progress` events
+ * while it runs.
  */
-export async function downloadMedia(videoId: string, kind: DownloadKind): Promise<Downloaded> {
-  return invoke<Downloaded>('download_media', { videoId, kind })
+export async function downloadMedia(
+  platform: Platform,
+  videoId: string,
+  kind: DownloadKind
+): Promise<Downloaded> {
+  return invoke<Downloaded>('download_media', { platform, videoId, kind })
 }
 
 /** Store key for one download: the same video can be downloaded as audio and as video. */
-export function downloadKey(videoId: string, kind: DownloadKind): string {
-  return `${videoId}:${kind}`
+export function downloadKey(platform: Platform, videoId: string, kind: DownloadKind): string {
+  return `${platform}:${videoId}:${kind}`
 }
 
 /**
@@ -85,6 +109,7 @@ export function downloadKey(videoId: string, kind: DownloadKind): string {
 export function resultToTrack(result: OnlineSearchResult): OnlineTrack {
   return {
     source: 'online',
+    platform: result.platform,
     videoId: result.video_id,
     path: result.video_id, // used as stable id by existing UI
     name: result.title,
@@ -92,7 +117,7 @@ export function resultToTrack(result: OnlineSearchResult): OnlineTrack {
     duration_secs: result.duration_secs,
     size_bytes: 0,
     art_path: result.thumbnail, // already an https URL
-    created_at: Date.now(),
+    created_at: result.timestamp ? result.timestamp * 1000 : Date.now(),
     uploader: result.uploader ?? undefined,
   }
 }

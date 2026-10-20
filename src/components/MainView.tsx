@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { listen } from '@tauri-apps/api/event'
 import { Library } from './Library'
-import { YouTubeSection } from './YouTubeSection'
+import { OnlineSection } from './OnlineSection'
 import { ScrollToActive } from './ScrollToActivate'
 import { useScan } from '../hooks/useScan'
 import { useDurations } from '../hooks/useDurations'
@@ -24,7 +24,7 @@ export function MainView() {
       <ScrollToActive />
       <div id={SCROLL_ROOT_ID} className="overflow-y-auto h-full py-2">
         <Library />
-        <YouTubeSection />
+        <OnlineSection />
       </div>
     </div>
   )
@@ -36,7 +36,7 @@ function useDownloadProgress() {
     const { setDownloadPercent } = useAppStore.getState()
     const unlisten = listen<DownloadProgress>('download_progress', ({ payload }) => {
       const percent = payload.total ? Math.round((payload.downloaded / payload.total) * 100) : null
-      setDownloadPercent(downloadKey(payload.video_id, payload.kind), percent)
+      setDownloadPercent(downloadKey(payload.platform, payload.video_id, payload.kind), percent)
     })
     return () => {
       unlisten.then((stop) => stop())

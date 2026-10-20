@@ -13,6 +13,7 @@ export interface LocalTrack extends MediaFile {
 
 export interface OnlineTrack {
   source: 'online'
+  platform: Platform
   videoId: string
   // mirror MediaFile field names so existing consumers Just Work
   path: string // = videoId, used as stable identifier (NOT a filesystem path)
@@ -20,7 +21,7 @@ export interface OnlineTrack {
   ext: string // 'm4a'; whether video plays is decided when the stream is resolved
   duration_secs: number // from search metadata
   size_bytes: number // 0 (unknown for streams)
-  art_path: string | null // YouTube thumbnail URL (https://...)
+  art_path: string | null // YouTube or Twitch thumbnail URL (https://...)
   created_at: number // upload timestamp from yt-dlp, or Date.now()
 
   // online-only
@@ -57,12 +58,19 @@ export interface ScanResult {
 export type ScanState = 'idle' | 'scanning' | 'done'
 export type OnlineSearchState = 'idle' | 'searching' | 'done' | 'error'
 
+/** Mirrors `online::Platform`: where an online result comes from. */
+export type Platform = 'youtube' | 'twitch'
+
+/** Mirrors `online::OnlineSearchResult`. */
 export interface OnlineSearchResult {
-  video_id: string
+  platform: Platform
+  video_id: string // YouTube id, or Twitch VOD id (`v2905135575`)
   title: string
   duration_secs: number
   thumbnail: string | null
-  uploader: string | null
+  uploader: string | null // for Twitch channel lists: the channel
+  view_count: number | null
+  timestamp: number | null // published or broadcast, Unix seconds
 }
 
 /** Mirrors `online::ResolvedStream` in src-tauri/src/online.rs. */
@@ -90,6 +98,7 @@ export interface Downloaded {
 
 /** Payload of the `download_progress` event (`download::DownloadProgress`). */
 export interface DownloadProgress {
+  platform: Platform
   video_id: string
   kind: DownloadKind
   downloaded: number

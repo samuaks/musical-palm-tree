@@ -22,7 +22,7 @@ export function useAudioPlayer(
   const setStorePlaying = useAppStore((s) => s.setPlaying)
   const setResolving = useAppStore((s) => s.setResolving)
   const setVideoActive = useAppStore((s) => s.setVideoActive)
-  const onlineVideo = useAppStore((s) => s.youtube.video)
+  const onlineVideo = useAppStore((s) => s.online.video)
 
   const audioRef = useRef<HTMLAudioElement>(new Audio())
   const [playing, setPlaying] = useState(false)
@@ -90,7 +90,7 @@ export function useAudioPlayer(
       } else {
         setResolving(true)
         try {
-          const stream = await resolveStream(track.videoId, onlineVideo)
+          const stream = await resolveStream(track.platform, track.videoId, onlineVideo)
           src = stream.audio_url
           videoSrc = stream.video_url
         } catch (e) {
@@ -147,7 +147,7 @@ export function useAudioPlayer(
   // retry on stream URL expiry for online tracks
   useEffect(() => {
     if (!track || track.source !== 'online') return
-    const videoId = track.videoId
+    const { platform, videoId } = track
     const audio = audioRef.current
     const video = syncedVideo ? videoRef.current : null
 
@@ -164,7 +164,7 @@ export function useAudioPlayer(
       setResolving(true)
 
       try {
-        const fresh = await resolveStream(videoId, video !== null)
+        const fresh = await resolveStream(platform, videoId, video !== null)
         if (cancelled) return // track changed during retry — abort
         setConvertedSrc(fresh.audio_url)
         if (video) {
