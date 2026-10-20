@@ -26,6 +26,8 @@ import { TrackCover } from './TrackCover'
 const MIN_HEIGHT = 160
 
 function formatTime(s: number) {
+  // e.g. the VOD of a broadcast that's still going has no fixed length yet
+  if (!Number.isFinite(s)) return '--:--'
   const m = Math.floor(s / 60)
   const sec = Math.floor(s % 60)
   return `${m}:${sec.toString().padStart(2, '0')}`
@@ -50,6 +52,7 @@ export function PlayerBar() {
 
   const displayName = track ? trackDisplayName(track.name) : 'No track selected'
   const trackIsVideo = useAppStore((s) => s.videoActive)
+  const live = track?.source === 'online' && !!track.live
   const onlineVideo = useAppStore((s) => s.online.video)
   const setOnlineVideo = useAppStore((s) => s.setOnlineVideo)
   const cover = useCoverArt(track)
@@ -90,7 +93,11 @@ export function PlayerBar() {
           <div className="flex flex-col min-w-0 flex-1">
             <span className="text-sm font-mono text-app-accent truncate">{displayName}</span>
             <span className="text-xs font-mono text-app-muted tabular-nums">
-              {formatTime(currentTime)} / {formatTime(duration)}
+              {live ? (
+                <span className="text-app-accent">● LIVE</span>
+              ) : (
+                `${formatTime(currentTime)} / ${formatTime(duration)}`
+              )}
             </span>
           </div>
 
@@ -163,8 +170,9 @@ export function PlayerBar() {
         <div className="flex-1 px-6 pb-2 min-h-0" style={{ height: '72px' }}>
           <Waveform
             data={waveformData}
-            currentTime={currentTime}
-            duration={duration}
+            // A live stream has no timeline: the line stays full
+            currentTime={live ? 1 : currentTime}
+            duration={live ? 1 : duration}
             onSeek={seek}
           />
         </div>

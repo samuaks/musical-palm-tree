@@ -165,7 +165,27 @@ function ResultRow({ result, onPlay }: { result: OnlineSearchResult; onPlay: () 
     .join(' · ')
   // The date always shows; the channel and views shorten first
   const age = result.timestamp !== null ? formatRelative(result.timestamp * 1000) : undefined
-  return (
+  return result.live ? (
+    // A live stream: no duration, no downloads (recording isn't supported)
+    <TrackRow
+      dataPath={result.video_id}
+      active={isActive}
+      cover={
+        <TrackCover
+          src={result.thumbnail}
+          video
+          loading={isActive && resolving}
+          active={isActive}
+          playing={isActive && playing}
+        />
+      }
+      title={result.title}
+      subtitle={subtitle}
+      subtitleEnd={age && `started ${age}`}
+      duration={<span className="text-app-accent font-bold tracking-wider">LIVE</span>}
+      onClick={onPlay}
+    />
+  ) : (
     <TrackRow
       dataPath={result.video_id}
       active={isActive}

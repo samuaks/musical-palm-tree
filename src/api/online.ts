@@ -119,5 +119,6 @@ export function resultToTrack(result: OnlineSearchResult): OnlineTrack {
     art_path: result.thumbnail, // already an https URL
     created_at: result.timestamp ? result.timestamp * 1000 : Date.now(),
     uploader: result.uploader ?? undefined,
+    live: result.live,
   }
 }

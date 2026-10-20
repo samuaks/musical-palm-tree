@@ -46,7 +46,8 @@ terminal player, and is meant as a learning-friendly codebase (the repository is
   matches, in an ONLINE section with **youtube** and **twitch** tabs:
   - **youtube**: a search (top 20 results).
   - **twitch**: type a channel name to list its 20 most recent VODs (Twitch itself can't be
-    searched).
+    searched). If the channel is live right now, its stream is listed on top with a **LIVE**
+    badge and plays live (no seeking, no recording).
   - Pasting a YouTube or Twitch link opens that video (or channel) on either tab.
 - Streaming goes through [yt-dlp](https://github.com/yt-dlp/yt-dlp): video up to 1080p (Twitch:
   720p) in the video pane, or audio only with the video button in the player bar. Not needed for

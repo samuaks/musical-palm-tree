@@ -24,6 +24,7 @@ pub fn run() {
             ytdlp::install_yt_dlp,
             online::search_online,
             online::resolve_stream,
+            online::fetch_live_playlist,
             download::download_media,
         ])
         .run(tauri::generate_context!())

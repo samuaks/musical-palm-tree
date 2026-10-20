@@ -186,6 +186,7 @@ ytdlp.rs ← yt_dlp_status / install_yt_dlp, finds/updates/runs yt-dlp
 | `cover_art`         | Cover thumbnail for one track, as data URL | async      |
 | `search_online`     | YouTube search / Twitch channel VODs / link | async      |
 | `resolve_stream`    | yt-dlp lookup of audio (+ video) URLs      | async      |
+| `fetch_live_playlist` | Twitch live playlist for hls.js (no Origin) | async     |
 | `download_media`    | Download audio/video into the library      | async      |
 | `yt_dlp_status`     | yt-dlp found / installable, ffmpeg found   | sync       |
 | `install_yt_dlp`    | Download + verify yt-dlp into app data dir | async      |
@@ -262,6 +263,21 @@ stream, it returns sound only.
   with the `Audio_Only` rendition; the picture stream then plays muted like YouTube's.
 - In a pair, the picture is whichever entry has one (even if it has sound too), and the sound is
   the other (`parse_resolved`).
+- **Twitch live** (`video_id` = `live:<channel>`) can't play natively, for two reasons found by
+  testing on Edge 155: the live playlist server (`*.playlist.ttvnw.net`) answers 403 to any
+  `Origin` that isn't twitch.tv, and live segments are MPEG-TS, which the built-in HLS player
+  rejects (VODs are fMP4). So live goes through **hls.js** (`src/utils/liveHls.ts`, loaded on
+  first use): it converts the segments for Media Source Extensions, and its playlist loader calls
+  the Rust command `fetch_live_playlist`, which fetches without an Origin (only https
+  `*.ttvnw.net`). Segments load directly; their servers allow any origin. `ResolvedStream.live`
+  is decided by that host, not by yt-dlp's `is_live`: the VOD of a broadcast still going is
+  "live" to yt-dlp but comes from the VOD CDN and plays natively.
+- **Live in the UI**: the channel list checks `twitch.tv/<channel>` while it lists the VODs
+  (both ~1.8 s, run in parallel) and puts the stream on top (its real title is yt-dlp's
+  `description`). Rows show **LIVE** instead of a duration and have no download buttons; the
+  player bar shows `● LIVE` and a full line; seeking does nothing. Toggling video or recovering
+  from an error restarts at the live edge. hls.js fatal errors use the same re-resolve-and-retry
+  path as expired URLs.
 
 - The sound plays in the `<audio>` element, which stays the master: play, pause, seek, volume,
   `timeupdate` and `ended` all go through it, as for any audio track.
