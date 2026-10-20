@@ -8,6 +8,7 @@ import {
   ResolvedStream,
   YtDlpStatus,
 } from '../types'
+import { useAppStore } from '../store'
 
 /** Whether yt-dlp is installed, and whether the app can install it. */
 export async function ytDlpStatus(): Promise<YtDlpStatus> {
@@ -23,6 +24,39 @@ export async function searchOnline(query: string): Promise<OnlineSearchResult[]>
   const trimmed = query.trim()
   if (!trimmed) return []
   return invoke<OnlineSearchResult[]>('search_online', { query: trimmed })
+}
+
+let searchSeq = 0
+
+/**
+ * Searches YouTube for `query` and puts the results in the store (`youtube.*`). Runs on Enter,
+ * not while typing. A newer search wins over a slower older one.
+ */
+export async function searchYouTube(query: string): Promise<void> {
+  const trimmed = query.trim()
+  const { ytDlp, setYouTubeResults, setYouTubeSearchState, setYouTubeSearchError } =
+    useAppStore.getState()
+  if (!trimmed || ytDlp?.available === false) return
+
+  const seq = ++searchSeq
+  setYouTubeSearchState('searching')
+  setYouTubeSearchError(null)
+  try {
+    const results = await searchOnline(trimmed)
+    if (seq !== searchSeq) return
+    setYouTubeResults(trimmed, results)
+    setYouTubeSearchState('done')
+  } catch (e) {
+    if (seq !== searchSeq) return
+    setYouTubeSearchError(typeof e === 'string' ? e : String(e))
+    setYouTubeSearchState('error')
+  }
+}
+
+/** Drops the YouTube results, and any search still running. */
+export function clearYouTubeSearch() {
+  searchSeq++
+  useAppStore.getState().clearYouTubeSearch()
 }
 
 /** Stream URLs for a video: audio, plus a video-only stream when `video` is on and available. */

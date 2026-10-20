@@ -4,9 +4,10 @@ import { selectCurrentTrack, useAppStore } from '../store'
 
 export function ScrollToActive() {
   const currentTrack = useAppStore(selectCurrentTrack)
-  const dirs = useAppStore((s) => s.spaces.local.dirs)
-  const collapsed = useAppStore((s) => s.spaces.local.collapsed)
-  const toggleCollapsed = useAppStore((s) => s.toggleLocalCollapsed)
+  const dirs = useAppStore((s) => s.library.dirs)
+  const collapsed = useAppStore((s) => s.library.collapsed)
+  const toggleCollapsed = useAppStore((s) => s.toggleLibraryCollapsed)
+  const searching = useAppStore((s) => s.query.trim() !== '')
 
   const [offscreen, setOffscreen] = useState(false)
   const observer = useRef<IntersectionObserver | null>(null)
@@ -22,8 +23,10 @@ export function ScrollToActive() {
       const el = document.querySelector(`[data-track-path="${CSS.escape(currentTrack.path)}"]`)
 
       if (!el) {
-        // track is in a collapsed album — show button so user can navigate to it
-        setOffscreen(true)
+        // A local track not in the list is in a collapsed album: show the button so the user
+        // can open it. A track filtered out by the search, or a YouTube result that isn't
+        // listed, has nowhere to scroll to.
+        setOffscreen(currentTrack.source === 'local' && !searching)
         return
       }
 
@@ -41,10 +44,14 @@ export function ScrollToActive() {
       clearTimeout(timeout)
       observer.current?.disconnect()
     }
-  }, [currentTrack, collapsed])
+  }, [currentTrack, collapsed, searching])
 
   function scrollToActive() {
     if (!currentTrack) return
+    if (currentTrack.source === 'online') {
+      scrollNow() // a YouTube result row, never inside an album
+      return
+    }
 
     // find which dir/album contains the active track
     for (const dir of dirs) {

@@ -22,7 +22,7 @@ export function useAudioPlayer(
   const setStorePlaying = useAppStore((s) => s.setPlaying)
   const setResolving = useAppStore((s) => s.setResolving)
   const setVideoActive = useAppStore((s) => s.setVideoActive)
-  const onlineVideo = useAppStore((s) => s.spaces.online.video)
+  const onlineVideo = useAppStore((s) => s.youtube.video)
 
   const audioRef = useRef<HTMLAudioElement>(new Audio())
   const [playing, setPlaying] = useState(false)

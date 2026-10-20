@@ -13,27 +13,26 @@ import {
 type Theme = 'dark' | 'light'
 
 const COLLAPSED_KEY = 'playmusic-collapsed'
-const ACTIVE_SPACE_KEY = 'playmusic-active-space'
 const ONLINE_VIDEO_KEY = 'playmusic-online-video'
+/** From when the app had separate Local/Online spaces; cleared at startup. */
+const LEGACY_ACTIVE_SPACE_KEY = 'playmusic-active-space'
 
-interface LocalSpaceState {
+interface LibraryState {
   // scan state
   dirs: Directory[]
   scanMeta: ScanMetaData | null
   scanState: ScanState
   liveCount: number
 
-  // ui state
-  query: string
   durations: Record<string, number>
 
   // collapsed albums
   collapsed: Set<string>
 }
 
-interface OnlineSpaceState {
-  query: string
+interface YouTubeState {
   results: OnlineSearchResult[]
+  searchedQuery: string | null // the query `results` belong to
   searchState: OnlineSearchState
   searchError: string | null
   video: boolean // play online tracks with picture (persisted)
@@ -41,12 +40,11 @@ interface OnlineSpaceState {
 }
 
 interface AppState {
-  activeSpaceId: string
+  // one search box: filters the library as you type, searches YouTube on Enter
+  query: string
 
-  spaces: {
-    local: LocalSpaceState
-    online: OnlineSpaceState
-  }
+  library: LibraryState
+  youtube: YouTubeState
 
   // playback state (queue is the single source of truth)
   queue: Track[]
@@ -62,7 +60,7 @@ interface AppState {
   theme: Theme
 
   // actions
-  setActiveSpaceId: (id: string) => void
+  setQuery: (query: string) => void
   setPlaying: (playing: boolean) => void
   setResolving: (resolving: boolean) => void
   setVideoActive: (videoActive: boolean) => void
@@ -75,181 +73,127 @@ interface AppState {
   playPrev: () => void
   clearQueue: () => void
 
-  // local space actions
-  setLocalDirs: (dirs: Directory[]) => void
-  setLocalScanMeta: (meta: ScanMetaData | null) => void
-  setLocalScanState: (state: ScanState) => void
-  setLocalLiveCount: (count: number) => void
-  setLocalQuery: (query: string) => void
-  setLocalDuration: (path: string, duration: number) => void
-  toggleLocalCollapsed: (key: string) => void
+  // library actions
+  setLibraryDirs: (dirs: Directory[]) => void
+  setLibraryScanMeta: (meta: ScanMetaData | null) => void
+  setLibraryScanState: (state: ScanState) => void
+  setLibraryLiveCount: (count: number) => void
+  setLibraryDuration: (path: string, duration: number) => void
+  toggleLibraryCollapsed: (key: string) => void
 
-  // online space actions
-  setOnlineQuery: (query: string) => void
-  setOnlineResults: (results: OnlineSearchResult[]) => void
-  setOnlineSearchState: (state: OnlineSearchState) => void
-  setOnlineSearchError: (error: string | null) => void
-  resetOnlineSearch: () => void
-  setOnlineVideo: (video: boolean) => void
+  // youtube actions
+  setYouTubeResults: (query: string, results: OnlineSearchResult[]) => void
+  setYouTubeSearchState: (state: OnlineSearchState) => void
+  setYouTubeSearchError: (error: string | null) => void
+  clearYouTubeSearch: () => void
+  setYouTubeVideo: (video: boolean) => void
   setDownload: (key: string, status: DownloadStatus) => void
   setDownloadPercent: (key: string, percent: number | null) => void
 }
 
-export const useAppStore = create<AppState>((set) => ({
-  activeSpaceId: loadActiveSpaceId(),
-  queue: [],
-  queueIndex: -1,
-  playing: false,
-  resolving: false,
-  videoActive: false,
-  ytDlp: null,
-  theme:
-    (typeof window !== 'undefined' && (localStorage.getItem('playmusic-theme') as Theme)) || 'dark',
+export const useAppStore = create<AppState>((set) => {
+  const setLibrary = (patch: (s: AppState) => Partial<LibraryState>) =>
+    set((s) => ({ library: { ...s.library, ...patch(s) } }))
+  const setYouTube = (patch: (s: AppState) => Partial<YouTubeState>) =>
+    set((s) => ({ youtube: { ...s.youtube, ...patch(s) } }))
 
-  spaces: {
-    local: {
+  return {
+    query: '',
+    queue: [],
+    queueIndex: -1,
+    playing: false,
+    resolving: false,
+    videoActive: false,
+    ytDlp: null,
+    theme:
+      (typeof window !== 'undefined' && (localStorage.getItem('playmusic-theme') as Theme)) ||
+      'dark',
+
+    library: {
       dirs: [],
       scanMeta: null,
       scanState: 'idle',
       liveCount: 0,
-      query: '',
       durations: {},
       collapsed: loadCollapsed(),
     },
-    online: {
-      query: '',
+    youtube: {
       results: [],
+      searchedQuery: null,
       searchState: 'idle',
       searchError: null,
       video: loadOnlineVideo(),
       downloads: {},
     },
-  },
 
-  setActiveSpaceId: (id) =>
-    set((s) => {
-      if (s.activeSpaceId === id) return s
-      localStorage.setItem(ACTIVE_SPACE_KEY, id)
-      return {
-        activeSpaceId: id,
-        queue: [],
-        queueIndex: -1,
-        playing: false,
-        resolving: false,
-      }
-    }),
-  setPlaying: (playing) => set({ playing }),
-  setResolving: (resolving) => set({ resolving }),
-  setVideoActive: (videoActive) => set({ videoActive }),
-  setYtDlp: (ytDlp) =>
-    set((s) =>
-      // Start on Local when Online can't work yet; not persisted, so Online is remembered.
-      s.ytDlp === null && !ytDlp.available && s.activeSpaceId === 'online'
-        ? { ytDlp, activeSpaceId: 'local' }
-        : { ytDlp }
-    ),
-  setTheme: (theme) => {
-    localStorage.setItem('playmusic-theme', theme)
-    document.documentElement.dataset.theme = theme
-    set({ theme })
-  },
-  playTrackFromList: (tracks, index) => {
-    if (tracks.length === 0 || index < 0 || index >= tracks.length) return
-    set({ queue: tracks, queueIndex: index })
-  },
+    setQuery: (query) => set({ query }),
+    setPlaying: (playing) => set({ playing }),
+    setResolving: (resolving) => set({ resolving }),
+    setVideoActive: (videoActive) => set({ videoActive }),
+    setYtDlp: (ytDlp) => set({ ytDlp }),
+    setTheme: (theme) => {
+      localStorage.setItem('playmusic-theme', theme)
+      document.documentElement.dataset.theme = theme
+      set({ theme })
+    },
+    playTrackFromList: (tracks, index) => {
+      if (tracks.length === 0 || index < 0 || index >= tracks.length) return
+      set({ queue: tracks, queueIndex: index })
+    },
 
-  playNext: () =>
-    set((s) => {
-      if (s.queueIndex < 0 || s.queueIndex >= s.queue.length - 1) return s
-      return { queueIndex: s.queueIndex + 1 }
-    }),
+    playNext: () =>
+      set((s) => {
+        if (s.queueIndex < 0 || s.queueIndex >= s.queue.length - 1) return s
+        return { queueIndex: s.queueIndex + 1 }
+      }),
 
-  playPrev: () =>
-    set((s) => {
-      if (s.queueIndex <= 0) return s
-      return { queueIndex: s.queueIndex - 1 }
-    }),
+    playPrev: () =>
+      set((s) => {
+        if (s.queueIndex <= 0) return s
+        return { queueIndex: s.queueIndex - 1 }
+      }),
 
-  clearQueue: () => set({ queue: [], queueIndex: -1 }),
+    clearQueue: () => set({ queue: [], queueIndex: -1 }),
 
-  setLocalDirs: (dirs) =>
-    set((s) => ({ spaces: { ...s.spaces, local: { ...s.spaces.local, dirs } } })),
-  setLocalScanMeta: (scanMeta) =>
-    set((s) => ({ spaces: { ...s.spaces, local: { ...s.spaces.local, scanMeta } } })),
-  setLocalScanState: (scanState) =>
-    set((s) => ({ spaces: { ...s.spaces, local: { ...s.spaces.local, scanState } } })),
-  setLocalLiveCount: (liveCount) =>
-    set((s) => ({ spaces: { ...s.spaces, local: { ...s.spaces.local, liveCount } } })),
-  setLocalQuery: (query) =>
-    set((s) => ({ spaces: { ...s.spaces, local: { ...s.spaces.local, query } } })),
-  setLocalDuration: (path, duration) =>
-    set((s) => ({
-      spaces: {
-        ...s.spaces,
-        local: {
-          ...s.spaces.local,
-          durations: { ...s.spaces.local.durations, [path]: duration },
-        },
-      },
-    })),
-  toggleLocalCollapsed: (key) =>
-    set((s) => {
-      const next = new Set(s.spaces.local.collapsed)
-      if (next.has(key)) next.delete(key)
-      else next.add(key)
-      localStorage.setItem(COLLAPSED_KEY, JSON.stringify([...next]))
-      return {
-        spaces: { ...s.spaces, local: { ...s.spaces.local, collapsed: next } },
-      }
-    }),
+    setLibraryDirs: (dirs) => setLibrary(() => ({ dirs })),
+    setLibraryScanMeta: (scanMeta) => setLibrary(() => ({ scanMeta })),
+    setLibraryScanState: (scanState) => setLibrary(() => ({ scanState })),
+    setLibraryLiveCount: (liveCount) => setLibrary(() => ({ liveCount })),
+    setLibraryDuration: (path, duration) =>
+      setLibrary((s) => ({ durations: { ...s.library.durations, [path]: duration } })),
+    toggleLibraryCollapsed: (key) =>
+      setLibrary((s) => {
+        const collapsed = new Set(s.library.collapsed)
+        if (collapsed.has(key)) collapsed.delete(key)
+        else collapsed.add(key)
+        localStorage.setItem(COLLAPSED_KEY, JSON.stringify([...collapsed]))
+        return { collapsed }
+      }),
 
-  setOnlineQuery: (query) =>
-    set((s) => ({ spaces: { ...s.spaces, online: { ...s.spaces.online, query } } })),
-  setOnlineResults: (results) =>
-    set((s) => ({ spaces: { ...s.spaces, online: { ...s.spaces.online, results } } })),
-  setOnlineSearchState: (searchState) =>
-    set((s) => ({ spaces: { ...s.spaces, online: { ...s.spaces.online, searchState } } })),
-  setOnlineSearchError: (searchError) =>
-    set((s) => ({ spaces: { ...s.spaces, online: { ...s.spaces.online, searchError } } })),
-  resetOnlineSearch: () =>
-    set((s) => ({
-      spaces: {
-        ...s.spaces,
-        online: {
-          ...s.spaces.online,
-          query: '',
-          results: [],
-          searchState: 'idle',
-          searchError: null,
-        },
-      },
-    })),
-  setOnlineVideo: (video) => {
-    localStorage.setItem(ONLINE_VIDEO_KEY, String(video))
-    set((s) => ({ spaces: { ...s.spaces, online: { ...s.spaces.online, video } } }))
-  },
-  setDownload: (key, status) =>
-    set((s) => ({
-      spaces: {
-        ...s.spaces,
-        online: { ...s.spaces.online, downloads: { ...s.spaces.online.downloads, [key]: status } },
-      },
-    })),
-  setDownloadPercent: (key, percent) =>
-    set((s) => {
-      const current = s.spaces.online.downloads[key]
-      if (current?.state !== 'downloading') return s
-      return {
-        spaces: {
-          ...s.spaces,
-          online: {
-            ...s.spaces.online,
-            downloads: { ...s.spaces.online.downloads, [key]: { ...current, percent } },
-          },
-        },
-      }
-    }),
-}))
+    setYouTubeResults: (searchedQuery, results) => setYouTube(() => ({ searchedQuery, results })),
+    setYouTubeSearchState: (searchState) => setYouTube(() => ({ searchState })),
+    setYouTubeSearchError: (searchError) => setYouTube(() => ({ searchError })),
+    clearYouTubeSearch: () =>
+      setYouTube(() => ({
+        results: [],
+        searchedQuery: null,
+        searchState: 'idle',
+        searchError: null,
+      })),
+    setYouTubeVideo: (video) => {
+      localStorage.setItem(ONLINE_VIDEO_KEY, String(video))
+      setYouTube(() => ({ video }))
+    },
+    setDownload: (key, status) =>
+      setYouTube((s) => ({ downloads: { ...s.youtube.downloads, [key]: status } })),
+    setDownloadPercent: (key, percent) =>
+      setYouTube((s) => {
+        const current = s.youtube.downloads[key]
+        if (current?.state !== 'downloading') return {}
+        return { downloads: { ...s.youtube.downloads, [key]: { ...current, percent } } }
+      }),
+  }
+})
 
 function loadCollapsed(): Set<string> {
   try {
@@ -266,6 +210,7 @@ function loadCollapsed(): Set<string> {
 if (typeof window !== 'undefined') {
   const initial = (localStorage.getItem('playmusic-theme') as Theme) || 'dark'
   document.documentElement.dataset.theme = initial
+  localStorage.removeItem(LEGACY_ACTIVE_SPACE_KEY)
 }
 
 export const selectCurrentTrack = (s: ReturnType<typeof useAppStore.getState>): Track | null => {
@@ -276,9 +221,4 @@ export const selectCurrentTrack = (s: ReturnType<typeof useAppStore.getState>): 
 function loadOnlineVideo(): boolean {
   if (typeof window === 'undefined') return true
   return localStorage.getItem(ONLINE_VIDEO_KEY) !== 'false'
-}
-
-function loadActiveSpaceId(): string {
-  if (typeof window === 'undefined') return 'online'
-  return localStorage.getItem(ACTIVE_SPACE_KEY) || 'online'
 }

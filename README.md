@@ -2,7 +2,8 @@
 
 A desktop media player for the music and videos already on your computer, built with Tauri, React and
 Rust. It finds media in your usual folders, groups it by folder and album, and plays it with a
-waveform-based player. An optional Online space adds YouTube search and streaming.
+waveform-based player. The same search box can also search YouTube (with the optional yt-dlp), to
+stream results or download them into your library.
 
 It's the desktop companion to [PlayMusic](https://github.com/samuaks/playmusic), a Go/Bubble Tea
 terminal player, and is meant as a learning-friendly codebase (the repository is named
@@ -18,15 +19,15 @@ terminal player, and is meant as a learning-friendly codebase (the repository is
   folder levels deep, for audio (mp3, flac, wav, aac, ogg, m4a) and video (mp4, mkv, webm, avi, mov).
 - Groups files by top-level folder, then album (the first subfolder). The library fills in while
   the scan is still running. Albums and tracks are sorted by name, with numbers in natural order (2 before 10).
-- Fuzzy search across file, album and folder names.
+- Fuzzy search across file, album and folder names, as you type.
 - Collapsible albums; which ones are collapsed is remembered.
 - Duplicate detection: files with the same size and the same first and last 4 KiB are listed once
   (the first copy found), and the header shows how many duplicates were hidden.
 
 **Player**
 
-- Plays audio and video. Next/previous follow the library order, and the next track starts when one
-  ends.
+- Plays audio and video. Next/previous follow the list the track was picked from (library order,
+  or the YouTube results), and the next track starts when one ends.
 - Cover art for the current track: the picture embedded in the file (mp3, flac, ogg, m4a), or else a
   `cover`, `folder`, `front` or `album` image (jpg/png) in the track's folder. YouTube thumbnails for
   online tracks.
@@ -37,26 +38,28 @@ terminal player, and is meant as a learning-friendly codebase (the repository is
 - Videos play in a resizable pane on the right; fullscreen with `F`, a double-click, or the
   fullscreen button. The player bar can be resized too.
 
-**Online space (optional)**
+**YouTube (optional)**
 
-- YouTube search (top 10 results) and streaming through
-  [yt-dlp](https://github.com/yt-dlp/yt-dlp): video up to 1080p in the video pane, or audio only
-  with the video button in the player bar. Not needed for local files; see
-  [Online space](#online-space-optional) below.
+- Press Enter in the search box to also search YouTube (top 10 results); they're listed under
+  your library's matches. Streaming goes through [yt-dlp](https://github.com/yt-dlp/yt-dlp):
+  video up to 1080p in the video pane, or audio only with the video button in the player bar.
+  Not needed for local files; see [YouTube search](#youtube-search-optional) below.
 - Download a result's audio (m4a, into `~/Music/YouTube`) or video (mp4, into `~/Videos/YouTube`)
-  from the buttons on its row; it shows up in the Local space right away.
+  from the buttons on its row; it shows up in your library right away.
 
 **App**
 
 - Light and dark themes, custom title bar.
-- Theme, volume, last-used space, collapsed albums, and pane sizes persist between sessions.
+- Theme, volume, video setting, collapsed albums, and pane sizes persist between sessions.
 
 | Light theme                                                          | Online space before yt-dlp is installed                                     |
 | -------------------------------------------------------------------- | --------------------------------------------------------------------------- |
 | ![Local library in the light theme](./screenshots/library-light.png) | ![Online space offering to download yt-dlp](./screenshots/online-setup.png) |
 
 <sub>Screenshots are from a Linux build with a generated demo library, which is why durations show
-`--:--` (see [Known limitations](#known-limitations)).</sub>
+`--:--` (see [Known limitations](#known-limitations)). They predate the single main view: the
+Local/Online sidebar they show has been replaced by one search box, and yt-dlp is now offered in
+the YOUTUBE section under the library.</sub>
 
 ## Keyboard shortcuts
 
@@ -117,12 +120,12 @@ cargo clippy --all-targets
 
 There's no CI for tests yet, so run these before opening a pull request.
 
-## Online space (optional)
+## YouTube search (optional)
 
-The Online space needs yt-dlp. The easiest way to get it is in the app: open the Online space and
-click **download yt-dlp**. playmusic downloads the official standalone build for your platform,
-checks it against the release's `SHA2-256SUMS`, and stores it in its app data folder (no admin
-rights needed). It then checks for a newer yt-dlp once a day, and right away if a search or stream
+Searching YouTube needs yt-dlp. The easiest way to get it is in the app: type something in the
+search box, and the YOUTUBE section under your library offers **download yt-dlp**. playmusic
+downloads the official standalone build for your platform, checks it against the release's
+`SHA2-256SUMS`, and stores it in its app data folder (no admin rights needed). It then checks for a newer yt-dlp once a day, and right away if a search or stream
 fails, since YouTube changes regularly break older versions.
 
 - **Release installers** already include yt-dlp. When that bundled copy falls behind, playmusic

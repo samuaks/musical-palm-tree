@@ -48,13 +48,12 @@ download and update itself (see `src-tauri/src/ytdlp.rs`). Only installers built
 
 ```
 src/
-  App.tsx            root shell; player bar, video pane, volume persist across spaces
-  spaces/            content "spaces" registered in spaces/index.tsx (Local, Online)
-  components/        Library, TrackList, Track, PlayerBar, Waveform, VideoPane, ...
+  App.tsx            root shell: Header, MainView + VideoPane, PlayerBar
+  components/        Header (search), MainView (Library + YouTubeSection), PlayerBar, ...
   hooks/             useScan, useAudioPlayer, useWaveform, useDurations, useResizable, ...
   store.ts           single Zustand store
   types.ts           TS mirrors of the Rust IPC structs
-  api/               track adapters (MediaFile → LocalTrack) and online invoke wrappers
+  api/               invoke wrappers, track adapters, scanLibrary() and searchYouTube()
 src-tauri/src/
   lib.rs             registers commands and plugins
   scanner.rs         scan_media: walks ~/{Downloads,Music,Videos,Desktop,Documents}
@@ -80,7 +79,7 @@ src-tauri/src/
   and `scan_progress` (full `Directory[]` snapshot, throttled to ≤ 1 per 250 ms because
   each one re-serializes the whole tree). Rescan with `scanLibrary()` in `src/api/local.ts`.
 - Download events: `download_progress` (`{ video_id, kind, downloaded, total }`, ≤ 4/s),
-  listened to in `src/spaces/OnlineSpace.tsx`.
+  listened to in `src/components/MainView.tsx`.
 - Local media files reach the WebView through the asset protocol (`convertFileSrc`),
   scoped to `$HOME/**` and `$APPCACHE/**` in `tauri.conf.json`. Cover art doesn't: it comes
   back from `cover_art` as a `data:` URL.
@@ -92,11 +91,12 @@ src-tauri/src/
 - Colors only via theme tokens: `text-app-*`, `bg-app-*`, `border-app-*`, or
   `var(--color-app-*)`. No hex values or raw `slate-*` / `red-*` Tailwind classes. Themes
   are defined in the `@theme` block of `src/App.css`.
-- Shared state goes in the Zustand store, not React Context. Per-space state is namespaced
-  under `spaces.<id>` (e.g. `spaces.local.*`).
-- Subscribe selectively: `useAppStore((s) => s.spaces.local.dirs)`, not the whole store.
-- New space: add `src/spaces/MySpace.tsx` (+ header), register it in `SPACES` in
-  `src/spaces/index.tsx`, and add state under `spaces` in `store.ts` if needed.
+- Shared state goes in the Zustand store, not React Context. It's grouped by source:
+  `library.*` (local files) and `youtube.*` (search results, downloads, video setting), with
+  the search box's `query` and playback state at the root.
+- Subscribe selectively: `useAppStore((s) => s.library.dirs)`, not the whole store.
+- There's one main view: the search box filters the library as you type and searches YouTube
+  only on Enter. Keep yt-dlp out of the per-keystroke path.
 - localStorage keys use the `playmusic-` prefix.
 - Prettier (`.prettierrc`): no semicolons, single quotes, 2-space indent, 100 columns.
 

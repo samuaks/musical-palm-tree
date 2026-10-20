@@ -8,7 +8,7 @@ export function useScan() {
   const hasScanned = useRef(false)
 
   useEffect(() => {
-    const { setLocalDirs, setLocalLiveCount, spaces } = useAppStore.getState()
+    const { setLibraryDirs, setLibraryLiveCount, library } = useAppStore.getState()
 
     let unlistenProgress: (() => void) | undefined
     let unlistenCount: (() => void) | undefined
@@ -16,15 +16,15 @@ export function useScan() {
     async function setup() {
       unlistenProgress = await listen<Directory[]>('scan_progress', (event) => {
         // Live snapshots fill an empty library; a rescan keeps the full one until it's done.
-        if (useAppStore.getState().spaces.local.scanMeta === null) setLocalDirs(event.payload)
+        if (useAppStore.getState().library.scanMeta === null) setLibraryDirs(event.payload)
       })
 
       unlistenCount = await listen<number>('scan_count', (event) => {
-        setLocalLiveCount(event.payload)
+        setLibraryLiveCount(event.payload)
       })
 
       // Scan once; later scans (after downloads) come from scanLibrary() callers.
-      if (hasScanned.current || spaces.local.dirs.length > 0) return
+      if (hasScanned.current || library.dirs.length > 0) return
       hasScanned.current = true
       await scanLibrary()
     }
