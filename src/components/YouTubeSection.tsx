@@ -13,6 +13,9 @@ import {
 import { scanLibrary } from '../api/local'
 import { DownloadKind, OnlineSearchResult, YtDlpDownloadProgress } from '../types'
 import { SourceHeader } from './SourceHeader'
+import { TrackRow } from './TrackRow'
+import { TrackCover } from './TrackCover'
+import { formatDuration } from '../utils/format'
 
 /**
  * The YOUTUBE part of the main view, shown while the search box isn't empty. YouTube is only
@@ -79,11 +82,11 @@ export function YouTubeSection() {
           {results.length > 0 && (
             <>
               {stale && <StatusRow>results for "{searchedQuery}"</StatusRow>}
-              <ul className="flex flex-col gap-1 px-4">
+              <div className="flex flex-col">
                 {results.map((r) => (
                   <ResultRow key={r.video_id} result={r} onPlay={() => handlePlay(r)} />
                 ))}
-              </ul>
+              </div>
             </>
           )}
         </>
@@ -100,43 +103,36 @@ function StatusRow({ children }: { children: ReactNode }) {
   )
 }
 
+/** A YouTube result, laid out like a library track; downloads sit before the duration. */
 function ResultRow({ result, onPlay }: { result: OnlineSearchResult; onPlay: () => void }) {
   const current = useAppStore(selectCurrentTrack)
   const resolving = useAppStore((s) => s.resolving)
-  const isPlaying = current?.source === 'online' && current.videoId === result.video_id
-  const isResolving = isPlaying && resolving
+  const playing = useAppStore((s) => s.playing)
+  const isActive = current?.source === 'online' && current.videoId === result.video_id
   return (
-    <li
-      data-track-path={result.video_id}
-      className={`group flex items-center gap-1 pr-2 rounded transition-colors ${
-        isPlaying ? 'bg-app-selected' : 'hover:bg-app-hover'
-      }`}
-    >
-      <button
-        onClick={onPlay}
-        className="flex-1 min-w-0 flex items-center gap-3 px-2 py-2 text-left"
-      >
-        <div className="w-12 h-12 rounded relative bg-app-skeleton overflow-hidden shrink-0">
-          {result.thumbnail && (
-            <img src={result.thumbnail} alt="" className="w-full h-full object-cover" />
-          )}
-          {isResolving && (
-            <div className="absolute inset-0 flex items-center justify-center bg-black/40">
-              <Loader2 size={20} className="animate-spin text-app-accent" />
-            </div>
-          )}
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="text-sm text-app-text truncate">{result.title}</div>
-          <div className="text-xs text-app-secondary truncate">
-            {result.uploader ?? 'Unknown'}
-            {result.duration_secs > 0 && ` · ${formatDuration(result.duration_secs)}`}
-          </div>
-        </div>
-      </button>
-      <DownloadButton videoId={result.video_id} kind="audio" />
-      <DownloadButton videoId={result.video_id} kind="video" />
-    </li>
+    <TrackRow
+      dataPath={result.video_id}
+      active={isActive}
+      cover={
+        <TrackCover
+          src={result.thumbnail}
+          video
+          loading={isActive && resolving}
+          active={isActive}
+          playing={isActive && playing}
+        />
+      }
+      title={result.title}
+      subtitle={result.uploader ?? 'Unknown'}
+      duration={formatDuration(result.duration_secs)}
+      onClick={onPlay}
+      actions={
+        <>
+          <DownloadButton videoId={result.video_id} kind="audio" />
+          <DownloadButton videoId={result.video_id} kind="video" />
+        </>
+      }
+    />
   )
 }
 
@@ -265,10 +261,4 @@ function EnableOnline() {
 
 function formatMb(bytes: number): string {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`
-}
-
-function formatDuration(seconds: number): string {
-  const m = Math.floor(seconds / 60)
-  const s = Math.floor(seconds % 60)
-  return `${m}:${s.toString().padStart(2, '0')}`
 }

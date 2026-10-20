@@ -1,13 +1,18 @@
-import { Music, Video } from 'lucide-react'
+import { useRef } from 'react'
 import { MediaFile } from '../types'
 import { isVideo } from '../constants'
-import { PlayingIndicator } from './PlayingIndicator'
 import { selectCurrentTrack, useAppStore } from '../store'
 import { useLocalFlatTracks } from '../hooks/useLocalFlatTracks'
+import { useRowCover } from '../hooks/useCoverArt'
+import { displayName } from '../utils/trackName'
+import { formatDuration, formatRelative } from '../utils/format'
+import { TrackRow } from './TrackRow'
+import { TrackCover } from './TrackCover'
 
 interface TrackProps {
   file: MediaFile
-  index: number
+  dirName: string
+  albumName: string | null
 }
 
 function highlight(text: string, query: string) {
@@ -23,36 +28,8 @@ function highlight(text: string, query: string) {
   )
 }
 
-function formatDuration(secs: number): string {
-  if (secs === 0) return '--:--'
-  const h = Math.floor(secs / 3600)
-  const m = Math.floor((secs % 3600) / 60)
-  const s = Math.floor(secs % 60)
-  if (h > 0) return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
-  return `${m}:${s.toString().padStart(2, '0')}`
-}
-
-function formatRelative(ms: number): string {
-  if (ms === 0) return ''
-  const diff = Date.now() - ms
-  const seconds = Math.floor(diff / 1000)
-  const minutes = Math.floor(seconds / 60)
-  const hours = Math.floor(minutes / 60)
-  const days = Math.floor(hours / 24)
-  const weeks = Math.floor(days / 7)
-  const months = Math.floor(days / 30)
-  const years = Math.floor(days / 365)
-
-  if (years > 0) return `${years}y ago`
-  if (months > 0) return `${months}mo ago`
-  if (weeks > 0) return `${weeks}w ago`
-  if (days > 0) return `${days}d ago`
-  if (hours > 0) return `${hours}h ago`
-  if (minutes > 0) return `${minutes}m ago`
-  return 'just now'
-}
-
-export function Track({ file, index }: TrackProps) {
+/** A library track: cover (or a music/video placeholder), name, `album · folder · added`. */
+export function Track({ file, dirName, albumName }: TrackProps) {
   const currentTrack = useAppStore(selectCurrentTrack)
 
   const flatTracks = useLocalFlatTracks()
@@ -62,11 +39,12 @@ export function Track({ file, index }: TrackProps) {
   const query = useAppStore((s) => s.query)
   const duration = useAppStore((s) => s.library.durations[file.path] ?? 0)
 
-  const isActive = currentTrack?.path == file.path
-  const isCurrentlyPlaying = isActive && playing
+  const rowRef = useRef<HTMLDivElement>(null)
+  const cover = useRowCover(file.path, rowRef)
 
-  const isVideoFile = isVideo(file.ext)
-  const displayName = file.name.replace(/\.[^/.]+$/, '')
+  const isActive = currentTrack?.path == file.path
+  const video = isVideo(file.ext)
+  const subtitle = [albumName, dirName, formatRelative(file.created_at)].filter(Boolean).join(' · ')
 
   function handleClick() {
     const idx = flatTracks.findIndex((t) => t.path === file.path)
@@ -75,46 +53,23 @@ export function Track({ file, index }: TrackProps) {
   }
 
   return (
-    <div
-      data-track-path={file.path}
+    <TrackRow
+      rowRef={rowRef}
+      dataPath={file.path}
+      active={isActive}
+      cover={
+        <TrackCover
+          src={cover}
+          video={video}
+          markVideo
+          active={isActive}
+          playing={isActive && playing}
+        />
+      }
+      title={highlight(displayName(file.name), query)}
+      subtitle={subtitle}
+      duration={formatDuration(duration)}
       onClick={handleClick}
-      className={`group flex items-center gap-4 px-6 py-2 cursor-pointer transition-colors ${
-        isActive ? 'bg-app-selected' : 'hover:bg-app-hover'
-      }`}
-    >
-      {/* index or playing indicator */}
-      <div className="w-8 flex items-center justify-end shrink-0">
-        {isActive ? (
-          <PlayingIndicator playing={isCurrentlyPlaying} />
-        ) : (
-          <span className="text-xs font-mono text-app-secondary tabular-nums">
-            {String(index + 1).padStart(2, '0')}
-          </span>
-        )}
-      </div>
-
-      {/* type icon */}
-      <div className={isCurrentlyPlaying ? 'text-app-accent' : 'text-app-secondary'}>
-        {isVideoFile ? <Video size={16} /> : <Music size={16} />}
-      </div>
-
-      {/* track name */}
-      <span
-        className={`text-sm font-mono flex-1 truncate min-w-0 ${
-          isActive ? 'text-app-accent' : 'text-app-text'
-        }`}
-      >
-        {highlight(displayName, query)}
-      </span>
-
-      <span className="text-sm font-mono text-app-secondary tabular-nums shrink-0 w-16 text-right">
-        {formatRelative(file.created_at)}
-      </span>
-
-      {/* duration */}
-      <span className="text-sm font-mono text-app-secondary tabular-nums text-right w-12 shrink-0">
-        {formatDuration(duration)}
-      </span>
-    </div>
+    />
   )
 }

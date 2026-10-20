@@ -51,7 +51,7 @@ export function Library() {
             count={dir.files.length + dir.albums.reduce((sum, a) => sum + a.files.length, 0)}
           />
 
-          <TrackList files={dir.files} />
+          <TrackList files={dir.files} dirName={dir.name} />
 
           {dir.albums.map((album) => {
             const key = `${dir.name}/${album.name}`
@@ -77,7 +77,9 @@ export function Library() {
                   </span>
                 </div>
 
-                {!isAlbumCollapsed && <TrackList files={album.files} />}
+                {!isAlbumCollapsed && (
+                  <TrackList files={album.files} dirName={dir.name} albumName={album.name} />
+                )}
               </div>
             )
           })}
