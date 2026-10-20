@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
+import { useElementWidth } from '../hooks/useElementWidth'
 
 interface WaveformProps {
   /** Normalized bar heights; empty while generating or when there's no waveform. */
@@ -8,7 +9,10 @@ interface WaveformProps {
   onSeek: (time: number) => void
 }
 const MAX_BAR_HEIGHT = 80
-const MIN_BAR_HEIGHT = 15
+const MIN_BAR_HEIGHT = 8
+// Thin bars to match the 1.5-2px icon strokes; as many as fit the width.
+const BAR_WIDTH = 2
+const BAR_GAP = 2
 const FADE = 'transition-opacity duration-300'
 
 /**
@@ -100,18 +104,23 @@ function Bars({
   progress: number
   hoverPct: number | null
 }) {
+  const ref = useRef<HTMLDivElement>(null)
+  const width = useElementWidth(ref)
+  const count = Math.max(1, Math.floor((width + BAR_GAP) / (BAR_WIDTH + BAR_GAP)))
+  const bars = useMemo(() => (width > 0 ? resample(data, count) : []), [data, count, width])
+  const head = Math.min(bars.length - 1, Math.floor(progress * bars.length))
+
   return (
-    <div className="w-full h-full flex items-end gap-0.5">
-      {data.map((v, i) => {
-        const barProgress = i / data.length
-        const played = barProgress < progress
-        const isHead = Math.abs(barProgress - progress) < 0.015
+    <div ref={ref} className="w-full h-full flex items-end" style={{ gap: `${BAR_GAP}px` }}>
+      {bars.map((v, i) => {
+        const barProgress = i / bars.length
+        const played = i < head
         const isHoverPreview = hoverPct !== null && barProgress <= hoverPct && !played
 
         const barHeight = Math.min(MAX_BAR_HEIGHT, Math.max(MIN_BAR_HEIGHT, v * 100))
 
         let color = 'var(--color-app-waveform)'
-        if (isHead) color = 'var(--color-app-text)'
+        if (i === head) color = 'var(--color-app-text)'
         else if (played) {
           // if hovering on played territory, dim bars between hover and head
           if (hoverPct !== null && barProgress >= hoverPct) {
@@ -126,15 +135,26 @@ function Bars({
         return (
           <div
             key={i}
-            style={{
-              flex: 1,
-              height: `${barHeight}%`,
-              background: color,
-              borderRadius: '2px',
-            }}
+            className="shrink-0 rounded-full"
+            style={{ width: `${BAR_WIDTH}px`, height: `${barHeight}%`, background: color }}
           />
         )
       })}
     </div>
   )
+}
+
+/**
+ * Resamples the waveform to exactly `count` bars. Each bar shows the loudest point it
+ * covers, so short peaks survive; with fewer points than bars, points are stretched.
+ */
+function resample(data: number[], count: number): number[] {
+  if (data.length === 0) return []
+  return Array.from({ length: count }, (_, i) => {
+    const start = Math.floor((i * data.length) / count)
+    const end = Math.max(start + 1, Math.floor(((i + 1) * data.length) / count))
+    let peak = 0
+    for (let j = start; j < end; j++) peak = Math.max(peak, data[j])
+    return peak
+  })
 }

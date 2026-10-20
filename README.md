@@ -30,9 +30,10 @@ terminal player, and is meant as a learning-friendly codebase (the repository is
 - Cover art for the current track: the picture embedded in the file (mp3, flac, ogg, m4a), or else a
   `cover`, `folder`, `front` or `album` image (jpg/png) in the track's folder. YouTube thumbnails for
   online tracks.
-- Waveform overview in the player bar: click to seek, hover to preview the position. It's built in
-  Rust from the first 60 seconds of the track. Until it's ready, and for tracks that have none
-  (online streams, unsupported codecs), a plain progress line does the same job.
+- Waveform of the whole track in the player bar: click to seek, hover to preview the position. It's
+  decoded in Rust in the background and cached, so replaying a track shows it instantly. Until it's
+  ready, and for tracks that have none (online streams, unsupported codecs), a plain progress line
+  does the same job.
 - Videos play in a resizable pane on the right; fullscreen with `F`, a double-click, or the
   fullscreen button. The player bar can be resized too.
 
@@ -73,7 +74,6 @@ These work while nothing else has keyboard focus (click an empty area after usin
   use different web engines (WebView2, WKWebView), so this is specific to Linux.
 - The scanned folders are fixed, and the library is only scanned at startup.
 - Duplicates are only counted; there's no view of which files they are.
-- The waveform reflects the first 60 seconds of a track, stretched across the whole track.
 - Online streams are audio-only.
 
 ## Supported formats
