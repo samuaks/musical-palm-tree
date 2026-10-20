@@ -132,6 +132,9 @@ src-tauri/src/
   bump the version if the output format or algorithm changes.
 - `Cargo.toml` builds dependencies with `opt-level = 3` in dev: unoptimized symphonia makes a
   waveform for a long track take minutes in `tauri dev`. Keep that override.
+- Online video above 360p is a separate video-only stream: it plays muted in the `<video>` and
+  follows the `<audio>`, which stays the master for every control (`useVideoSync`). Keep yt-dlp
+  format selectors on https (WebView2 can't play HLS) and prefer avc1.
 
 ## Git and PRs
 

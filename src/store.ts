@@ -13,6 +13,7 @@ type Theme = 'dark' | 'light'
 
 const COLLAPSED_KEY = 'playmusic-collapsed'
 const ACTIVE_SPACE_KEY = 'playmusic-active-space'
+const ONLINE_VIDEO_KEY = 'playmusic-online-video'
 
 interface LocalSpaceState {
   // scan state
@@ -34,6 +35,7 @@ interface OnlineSpaceState {
   results: OnlineSearchResult[]
   searchState: OnlineSearchState
   searchError: string | null
+  video: boolean // play online tracks with picture (persisted)
 }
 
 interface AppState {
@@ -49,6 +51,7 @@ interface AppState {
   queueIndex: number // -1 when nothing has been played yet
   playing: boolean
   resolving: boolean
+  videoActive: boolean // the current track is showing a picture in the video pane
 
   // null until checked at startup
   ytDlp: YtDlpStatus | null
@@ -60,6 +63,7 @@ interface AppState {
   setActiveSpaceId: (id: string) => void
   setPlaying: (playing: boolean) => void
   setResolving: (resolving: boolean) => void
+  setVideoActive: (videoActive: boolean) => void
   setYtDlp: (status: YtDlpStatus) => void
   setTheme: (theme: Theme) => void
 
@@ -84,6 +88,7 @@ interface AppState {
   setOnlineSearchState: (state: OnlineSearchState) => void
   setOnlineSearchError: (error: string | null) => void
   resetOnlineSearch: () => void
+  setOnlineVideo: (video: boolean) => void
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -92,6 +97,7 @@ export const useAppStore = create<AppState>((set) => ({
   queueIndex: -1,
   playing: false,
   resolving: false,
+  videoActive: false,
   ytDlp: null,
   theme:
     (typeof window !== 'undefined' && (localStorage.getItem('playmusic-theme') as Theme)) || 'dark',
@@ -111,6 +117,7 @@ export const useAppStore = create<AppState>((set) => ({
       results: [],
       searchState: 'idle',
       searchError: null,
+      video: loadOnlineVideo(),
     },
   },
 
@@ -128,6 +135,7 @@ export const useAppStore = create<AppState>((set) => ({
     }),
   setPlaying: (playing) => set({ playing }),
   setResolving: (resolving) => set({ resolving }),
+  setVideoActive: (videoActive) => set({ videoActive }),
   setYtDlp: (ytDlp) =>
     set((s) =>
       // Start on Local when Online can't work yet; not persisted, so Online is remembered.
@@ -211,6 +219,10 @@ export const useAppStore = create<AppState>((set) => ({
         },
       },
     })),
+  setOnlineVideo: (video) => {
+    localStorage.setItem(ONLINE_VIDEO_KEY, String(video))
+    set((s) => ({ spaces: { ...s.spaces, online: { ...s.spaces.online, video } } }))
+  },
 }))
 
 function loadCollapsed(): Set<string> {
@@ -233,6 +245,11 @@ if (typeof window !== 'undefined') {
 export const selectCurrentTrack = (s: ReturnType<typeof useAppStore.getState>): Track | null => {
   if (s.queueIndex < 0 || s.queueIndex >= s.queue.length) return null
   return s.queue[s.queueIndex]
+}
+
+function loadOnlineVideo(): boolean {
+  if (typeof window === 'undefined') return true
+  return localStorage.getItem(ONLINE_VIDEO_KEY) !== 'false'
 }
 
 function loadActiveSpaceId(): string {
