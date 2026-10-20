@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { listen } from '@tauri-apps/api/event'
-import { Globe, Loader2, AlertCircle, Download } from 'lucide-react'
+import { Globe, Loader2, AlertCircle, Download, Music, Film, Check } from 'lucide-react'
 import { selectCurrentTrack, useAppStore } from '../store'
-import { installYtDlp, resultToTrack, ytDlpStatus } from '../api/online'
-import { OnlineSearchResult, YtDlpDownloadProgress } from '../types'
+import { downloadKey, downloadMedia, installYtDlp, resultToTrack, ytDlpStatus } from '../api/online'
+import { scanLibrary } from '../api/local'
+import { DownloadKind, DownloadProgress, OnlineSearchResult, YtDlpDownloadProgress } from '../types'
 
 export function OnlineSpace() {
   const query = useAppStore((s) => s.spaces.online.query)
@@ -12,6 +13,17 @@ export function OnlineSpace() {
   const searchError = useAppStore((s) => s.spaces.online.searchError)
   const playTrackFromList = useAppStore((s) => s.playTrackFromList)
   const ytDlp = useAppStore((s) => s.ytDlp)
+  const setDownloadPercent = useAppStore((s) => s.setDownloadPercent)
+
+  useEffect(() => {
+    const unlisten = listen<DownloadProgress>('download_progress', ({ payload }) => {
+      const percent = payload.total ? Math.round((payload.downloaded / payload.total) * 100) : null
+      setDownloadPercent(downloadKey(payload.video_id, payload.kind), percent)
+    })
+    return () => {
+      unlisten.then((stop) => stop())
+    }
+  }, [])
 
   function handlePlay(result: OnlineSearchResult) {
     const idx = results.findIndex((r) => r.video_id === result.video_id)
@@ -51,12 +63,14 @@ function ResultRow({ result, onPlay }: { result: OnlineSearchResult; onPlay: () 
   const isPlaying = current?.source === 'online' && current.videoId === result.video_id
   const isResolving = isPlaying && resolving
   return (
-    <li>
+    <li
+      className={`group flex items-center gap-1 pr-2 rounded transition-colors ${
+        isPlaying ? 'bg-app-selected' : 'hover:bg-app-hover'
+      }`}
+    >
       <button
         onClick={onPlay}
-        className={`w-full flex items-center gap-3 px-2 py-2 rounded text-left transition-colors ${
-          isPlaying ? 'bg-app-selected' : 'hover:bg-app-hover'
-        }`}
+        className="flex-1 min-w-0 flex items-center gap-3 px-2 py-2 text-left"
       >
         <div className="w-12 h-12 rounded relative bg-app-skeleton overflow-hidden shrink-0">
           {result.thumbnail && (
@@ -76,7 +90,72 @@ function ResultRow({ result, onPlay }: { result: OnlineSearchResult; onPlay: () 
           </div>
         </div>
       </button>
+      <DownloadButton videoId={result.video_id} kind="audio" />
+      <DownloadButton videoId={result.video_id} kind="video" />
     </li>
+  )
+}
+
+/**
+ * Saves a result into the library (audio → ~/Music/YouTube, video → ~/Videos/YouTube) and
+ * rescans so it shows up in the Local space. Hidden until the row is hovered, unless it's
+ * downloading, done or failed.
+ */
+function DownloadButton({ videoId, kind }: { videoId: string; kind: DownloadKind }) {
+  const key = downloadKey(videoId, kind)
+  const status = useAppStore((s) => s.spaces.online.downloads[key])
+  const ffmpeg = useAppStore((s) => s.ytDlp?.ffmpeg ?? false)
+  const setDownload = useAppStore((s) => s.setDownload)
+
+  async function download() {
+    if (status?.state === 'downloading') return
+    setDownload(key, { state: 'downloading', percent: null })
+    try {
+      const { path } = await downloadMedia(videoId, kind)
+      setDownload(key, { state: 'done', percent: 100, path })
+      scanLibrary()
+    } catch (e) {
+      setDownload(key, { state: 'error', percent: null, error: String(e) })
+    }
+  }
+
+  const label =
+    kind === 'audio' ? 'audio' : ffmpeg ? 'video' : 'video (360p, install ffmpeg for HD)'
+  const title =
+    status?.state === 'downloading'
+      ? `downloading ${kind}...`
+      : status?.state === 'done'
+        ? `saved to ${status.path}`
+        : status?.state === 'error'
+          ? `download failed, click to retry: ${status.error}`
+          : `download ${label}`
+  const Icon = kind === 'audio' ? Music : Film
+
+  return (
+    <button
+      onClick={download}
+      title={title}
+      className={`h-8 min-w-8 px-1.5 flex items-center justify-center gap-1 rounded text-xs font-mono transition-colors ${
+        status
+          ? status.state === 'error'
+            ? 'text-app-muted hover:text-app-text'
+            : 'text-app-accent'
+          : 'text-app-muted hover:text-app-text opacity-0 group-hover:opacity-100 focus-visible:opacity-100'
+      }`}
+    >
+      {status?.state === 'downloading' ? (
+        <>
+          <Loader2 size={14} className="animate-spin" />
+          {status.percent !== null && <span className="tabular-nums">{status.percent}%</span>}
+        </>
+      ) : status?.state === 'done' ? (
+        <Check size={14} />
+      ) : status?.state === 'error' ? (
+        <AlertCircle size={14} />
+      ) : (
+        <Icon size={14} />
+      )}
+    </button>
   )
 }
 

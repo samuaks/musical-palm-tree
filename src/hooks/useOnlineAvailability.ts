@@ -8,6 +8,6 @@ export function useOnlineAvailability() {
     const { setYtDlp } = useAppStore.getState()
     ytDlpStatus()
       .then(setYtDlp)
-      .catch(() => setYtDlp({ available: false, can_install: false }))
+      .catch(() => setYtDlp({ available: false, can_install: false, ffmpeg: false }))
   }, [])
 }

@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime};
 use tauri::async_runtime::RwLock;
 use tauri::{AppHandle, Emitter, Manager};
-use tauri_plugin_shell::process::Output;
+use tauri_plugin_shell::process::{CommandEvent, Output};
 use tauri_plugin_shell::ShellExt;
 
 const RELEASES: &str = "https://github.com/yt-dlp/yt-dlp/releases";
@@ -27,6 +27,8 @@ pub struct Status {
     available: bool,
     /// Whether the app can download yt-dlp itself on this platform.
     can_install: bool,
+    /// Whether ffmpeg was found, for HD video downloads and tagged audio.
+    ffmpeg: bool,
 }
 
 /// One yt-dlp release, e.g. version `2026.08.19` at `.../releases/download/2026.08.19`.
@@ -64,6 +66,7 @@ pub fn yt_dlp_status(app: AppHandle) -> Status {
     Status {
         available: locate(&app).is_some(),
         can_install: asset_name().is_some(),
+        ffmpeg: locate_ffmpeg().is_some(),
     }
 }
 
@@ -91,11 +94,10 @@ pub async fn run(app: &AppHandle, args: &[&str]) -> Result<String, String> {
     let found = locate(app).ok_or(NOT_FOUND)?;
     let mut output = exec(app, &found.path, args).await?;
 
-    if !output.status.success() && update_due(app, RETRY_UPDATE_EVERY) && update(app, &found).await
-    {
-        // An outdated bundled copy was superseded by a managed one, so look it up again.
-        let found = locate(app).ok_or(NOT_FOUND)?;
-        output = exec(app, &found.path, args).await?;
+    if !output.status.success() {
+        if let Some(found) = updated_copy(app, &found).await {
+            output = exec(app, &found.path, args).await?;
+        }
     }
 
     if !output.status.success() {
@@ -103,6 +105,39 @@ pub async fn run(app: &AppHandle, args: &[&str]) -> Result<String, String> {
         return Err(format!("yt-dlp exited with error: {stderr}"));
     }
     Ok(String::from_utf8_lossy(&output.stdout).into_owned())
+}
+
+/// Like [`run`], but hands each line of output (stdout and stderr) to `on_line` as it arrives,
+/// for long-running commands such as downloads.
+pub async fn run_streaming(
+    app: &AppHandle,
+    args: &[&str],
+    mut on_line: impl FnMut(&str),
+) -> Result<String, String> {
+    let found = locate(app).ok_or(NOT_FOUND)?;
+    let mut output = exec_streaming(app, &found.path, args, &mut on_line).await?;
+
+    if !output.success {
+        if let Some(found) = updated_copy(app, &found).await {
+            output = exec_streaming(app, &found.path, args, &mut on_line).await?;
+        }
+    }
+
+    if !output.success {
+        return Err(format!("yt-dlp exited with error: {}", output.stderr));
+    }
+    Ok(output.stdout)
+}
+
+/// After a failed run: updates yt-dlp if a check is due and returns the copy to retry with, or
+/// `None` if there's nothing newer. An outdated bundled copy is superseded by a managed one, so
+/// this looks it up again.
+async fn updated_copy(app: &AppHandle, found: &Found) -> Option<Found> {
+    if update_due(app, RETRY_UPDATE_EVERY) && update(app, found).await {
+        locate(app)
+    } else {
+        None
+    }
 }
 
 /// At startup, updates the copy in use if it hasn't been checked in a day.
@@ -126,6 +161,52 @@ async fn exec(app: &AppHandle, path: &Path, args: &[&str]) -> Result<Output, Str
         .output()
         .await
         .map_err(|e| format!("yt-dlp execution failed: {e}"))
+}
+
+struct Captured {
+    success: bool,
+    stdout: String,
+    stderr: String,
+}
+
+async fn exec_streaming(
+    app: &AppHandle,
+    path: &Path,
+    args: &[&str],
+    on_line: &mut impl FnMut(&str),
+) -> Result<Captured, String> {
+    let _lock = BINARY.read().await;
+    let (mut events, _child) = app
+        .shell()
+        .command(path)
+        .args(args)
+        .spawn()
+        .map_err(|e| format!("yt-dlp execution failed: {e}"))?;
+
+    let mut out = Captured {
+        success: false,
+        stdout: String::new(),
+        stderr: String::new(),
+    };
+    while let Some(event) = events.recv().await {
+        let (bytes, buf) = match event {
+            CommandEvent::Stdout(bytes) => (bytes, &mut out.stdout),
+            CommandEvent::Stderr(bytes) => (bytes, &mut out.stderr),
+            CommandEvent::Terminated(status) => {
+                out.success = status.code == Some(0);
+                continue;
+            }
+            CommandEvent::Error(e) => return Err(format!("yt-dlp execution failed: {e}")),
+            _ => continue,
+        };
+        let text = String::from_utf8_lossy(&bytes);
+        for line in text.lines() {
+            on_line(line);
+            buf.push_str(line);
+            buf.push('\n');
+        }
+    }
+    Ok(out)
 }
 
 /// If the copy in use is older than the newest release, installs that release as the
@@ -219,29 +300,40 @@ fn locate(app: &AppHandle) -> Option<Found> {
     // executable.
     let bundled = std::env::current_exe()
         .ok()
-        .and_then(|exe| find_yt_dlp(exe.parent().map(Path::to_path_buf)));
+        .and_then(|exe| find_exe(&exe_name(), exe.parent().map(Path::to_path_buf)));
     if let Some(path) = bundled {
         return found(path, Source::Bundled);
     }
 
+    find_exe(&exe_name(), search_dirs()).and_then(|path| found(path, Source::External))
+}
+
+/// ffmpeg, if installed. Optional: yt-dlp needs it to merge video and audio above 360p and to
+/// embed tags and cover art in downloads.
+pub fn locate_ffmpeg() -> Option<PathBuf> {
+    find_exe(
+        &format!("ffmpeg{}", std::env::consts::EXE_SUFFIX),
+        search_dirs(),
+    )
+}
+
+/// `PATH`, then where Homebrew and pipx install tools: apps launched from Finder/Dock (macOS) or
+/// some Linux desktops don't get the shell's PATH.
+fn search_dirs() -> impl Iterator<Item = PathBuf> {
     let path_dirs = std::env::var_os("PATH")
         .map(|p| std::env::split_paths(&p).collect::<Vec<_>>())
         .unwrap_or_default();
-    // Apps launched from Finder/Dock (macOS) or some Linux desktops don't get the shell's PATH,
-    // so also try where Homebrew and pipx install it.
     let common_dirs = ["/opt/homebrew/bin", "/usr/local/bin"]
         .map(PathBuf::from)
         .into_iter()
         .chain(dirs::home_dir().map(|home| home.join(".local").join("bin")));
-
-    find_yt_dlp(path_dirs.into_iter().chain(common_dirs))
-        .and_then(|path| found(path, Source::External))
+    path_dirs.into_iter().chain(common_dirs)
 }
 
-/// The first `yt-dlp` executable found in `dirs`, in order.
-fn find_yt_dlp(dirs: impl IntoIterator<Item = PathBuf>) -> Option<PathBuf> {
+/// The first executable called `name` found in `dirs`, in order.
+fn find_exe(name: &str, dirs: impl IntoIterator<Item = PathBuf>) -> Option<PathBuf> {
     dirs.into_iter()
-        .map(|dir| dir.join(exe_name()))
+        .map(|dir| dir.join(name))
         .find(|p| p.is_file())
 }
 
@@ -430,7 +522,10 @@ ffff *yt-dlp_macos
         std::fs::write(second.path().join(exe_name()), b"").unwrap();
 
         let dirs = [empty.path(), first.path(), second.path()].map(Path::to_path_buf);
-        assert_eq!(find_yt_dlp(dirs), Some(first.path().join(exe_name())));
+        assert_eq!(
+            find_exe(&exe_name(), dirs),
+            Some(first.path().join(exe_name()))
+        );
     }
 
     #[test]
@@ -440,15 +535,15 @@ ffff *yt-dlp_macos
             empty.path().to_path_buf(),
             empty.path().join("does-not-exist"),
         ];
-        assert_eq!(find_yt_dlp(dirs), None);
-        assert_eq!(find_yt_dlp(Vec::new()), None);
+        assert_eq!(find_exe(&exe_name(), dirs), None);
+        assert_eq!(find_exe(&exe_name(), Vec::new()), None);
     }
 
     #[test]
     fn a_directory_named_yt_dlp_is_not_a_match() {
         let dir = TempDir::new().unwrap();
         std::fs::create_dir(dir.path().join(exe_name())).unwrap();
-        assert_eq!(find_yt_dlp([dir.path().to_path_buf()]), None);
+        assert_eq!(find_exe(&exe_name(), [dir.path().to_path_buf()]), None);
     }
 
     #[test]

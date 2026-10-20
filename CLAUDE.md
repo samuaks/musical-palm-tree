@@ -61,7 +61,8 @@ src-tauri/src/
   art.rs             cover_art: embedded or folder cover → cached thumbnail → data URL
   waveform.rs        generate_waveform: whole-track symphonia decode → ≤1024 points, cached
   online.rs          search_online / resolve_stream (parse yt-dlp output)
-  ytdlp.rs           finds, installs, updates and runs yt-dlp (optional, app-managed)
+  download.rs        download_media: audio/video into ~/{Music,Videos}/YouTube (ffmpeg optional)
+  ytdlp.rs           finds, installs, updates and runs yt-dlp (optional, app-managed); finds ffmpeg
 ```
 
 ## IPC contract
@@ -70,13 +71,16 @@ src-tauri/src/
   mirrors live in `src/types.ts`. **Change both sides together.** (`scanner.rs` has a test
   pinning `MediaFile`'s field names.)
 - Commands: `scan_media`, `generate_waveform`, `cover_art`, `search_online`,
-  `resolve_stream`, `yt_dlp_status`, `install_yt_dlp`. New commands must be added to `generate_handler!` in
+  `resolve_stream`, `download_media`, `yt_dlp_status`, `install_yt_dlp`. New commands must be added to `generate_handler!` in
   `lib.rs`. Window permissions live in `src-tauri/capabilities/default.json`; Rust-side
   process spawning (`tauri-plugin-shell`'s `command()`) isn't scoped by capabilities.
-- Run yt-dlp only through `ytdlp::run`, which handles lookup, locking and update-and-retry.
+- Run yt-dlp only through `ytdlp::run` (or `ytdlp::run_streaming` for line-by-line output),
+  which handle lookup, locking and update-and-retry.
 - Scan events, listened to in `src/hooks/useScan.ts`: `scan_count` (files merged so far)
   and `scan_progress` (full `Directory[]` snapshot, throttled to ≤ 1 per 250 ms because
-  each one re-serializes the whole tree).
+  each one re-serializes the whole tree). Rescan with `scanLibrary()` in `src/api/local.ts`.
+- Download events: `download_progress` (`{ video_id, kind, downloaded, total }`, ≤ 4/s),
+  listened to in `src/spaces/OnlineSpace.tsx`.
 - Local media files reach the WebView through the asset protocol (`convertFileSrc`),
   scoped to `$HOME/**` and `$APPCACHE/**` in `tauri.conf.json`. Cover art doesn't: it comes
   back from `cover_art` as a `data:` URL.
