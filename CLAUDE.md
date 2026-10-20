@@ -49,18 +49,18 @@ download and update itself (see `src-tauri/src/ytdlp.rs`). Only installers built
 ```
 src/
   App.tsx            root shell: Header, MainView + VideoPane, PlayerBar
-  components/        Header (search), MainView (Library + YouTubeSection), PlayerBar, ...
+  components/        Header (search), MainView (Library + OnlineSection), PlayerBar, ...
   hooks/             useScan, useAudioPlayer, useWaveform, useDurations, useResizable, ...
   store.ts           single Zustand store
   types.ts           TS mirrors of the Rust IPC structs
-  api/               invoke wrappers, track adapters, scanLibrary() and searchYouTube()
+  api/               invoke wrappers, track adapters, scanLibrary() and searchOnlineNow()
 src-tauri/src/
   lib.rs             registers commands and plugins
   scanner.rs         scan_media: walks ~/{Downloads,Music,Videos,Desktop,Documents}
   art.rs             cover_art: embedded or folder cover → cached thumbnail → data URL
   waveform.rs        generate_waveform: whole-track symphonia decode → ≤1024 points, cached
-  online.rs          search_online / resolve_stream (parse yt-dlp output)
-  download.rs        download_media: audio/video into ~/{Music,Videos}/YouTube (ffmpeg optional)
+  online.rs          search_online / resolve_stream for YouTube and Twitch (parse yt-dlp output)
+  download.rs        download_media: audio/video into ~/{Music,Videos}/{YouTube,Twitch}
   ytdlp.rs           finds, installs, updates and runs yt-dlp (optional, app-managed); finds ffmpeg
 ```
 
@@ -78,7 +78,7 @@ src-tauri/src/
 - Scan events, listened to in `src/hooks/useScan.ts`: `scan_count` (files merged so far)
   and `scan_progress` (full `Directory[]` snapshot, throttled to ≤ 1 per 250 ms because
   each one re-serializes the whole tree). Rescan with `scanLibrary()` in `src/api/local.ts`.
-- Download events: `download_progress` (`{ video_id, kind, downloaded, total }`, ≤ 4/s),
+- Download events: `download_progress` (`{ platform, video_id, kind, downloaded, total }`, ≤ 4/s),
   listened to in `src/components/MainView.tsx`.
 - Local media files reach the WebView through the asset protocol (`convertFileSrc`),
   scoped to `$HOME/**` and `$APPCACHE/**` in `tauri.conf.json`. Cover art doesn't: it comes
@@ -92,11 +92,11 @@ src-tauri/src/
   `var(--color-app-*)`. No hex values or raw `slate-*` / `red-*` Tailwind classes. Themes
   are defined in the `@theme` block of `src/App.css`.
 - Shared state goes in the Zustand store, not React Context. It's grouped by source:
-  `library.*` (local files) and `youtube.*` (search results, downloads, video setting), with
-  the search box's `query` and playback state at the root.
+  `library.*` (local files) and `online.*` (platform tab, search results, downloads, video
+  setting), with the search box's `query` and playback state at the root.
 - Subscribe selectively: `useAppStore((s) => s.library.dirs)`, not the whole store.
-- There's one main view: the search box filters the library as you type and searches YouTube
-  only on Enter. Keep yt-dlp out of the per-keystroke path.
+- There's one main view: the search box filters the library as you type and searches online
+  (YouTube, or a Twitch channel's VODs) only on Enter. Keep yt-dlp out of the per-keystroke path.
 - localStorage keys use the `playmusic-` prefix.
 - Prettier (`.prettierrc`): no semicolons, single quotes, 2-space indent, 100 columns.
 
@@ -137,9 +137,12 @@ src-tauri/src/
   bump the version if the output format or algorithm changes.
 - `Cargo.toml` builds dependencies with `opt-level = 3` in dev: unoptimized symphonia makes a
   waveform for a long track take minutes in `tauri dev`. Keep that override.
-- Online video above 360p is a separate video-only stream: it plays muted in the `<video>` and
-  follows the `<audio>`, which stays the master for every control (`useVideoSync`). Keep yt-dlp
-  format selectors on https (WebView2 can't play HLS) and prefer avc1.
+- Online video plays as two streams: the picture muted in the `<video>`, following the
+  `<audio>`, which stays the master for every control (`useVideoSync`). YouTube: a video-only
+  https stream (prefer avc1) + m4a. Twitch: HLS only, played natively by the WebView (its CDN
+  allows CORS only for twitch.tv, so hls.js can't be used); a ≤720p stream is paired with
+  `Audio_Only` via `--audio-multistreams`. yt-dlp can't search Twitch: the twitch tab lists a
+  channel's VODs.
 
 ## Git and PRs
 

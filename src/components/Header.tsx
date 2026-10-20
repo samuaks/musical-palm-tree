@@ -1,22 +1,23 @@
 import { ReactNode } from 'react'
 import { Search } from 'lucide-react'
 import { useAppStore } from '../store'
-import { clearYouTubeSearch, searchYouTube } from '../api/online'
+import { clearOnlineSearch, searchOnlineNow } from '../api/online'
 import { ThemeToggle } from './ThemeToggle'
 
-/** Library stats and the one search box: filters the library as you type, Enter searches YouTube. */
+/** Library stats and the one search box: filters the library as you type, Enter searches online. */
 export function Header() {
   const query = useAppStore((s) => s.query)
   const setQuery = useAppStore((s) => s.setQuery)
   const scanMeta = useAppStore((s) => s.library.scanMeta)
   const scanState = useAppStore((s) => s.library.scanState)
   const liveCount = useAppStore((s) => s.library.liveCount)
-  const youtubeSearching = useAppStore((s) => s.youtube.searchState === 'searching')
-  const youtubeReady = useAppStore((s) => s.ytDlp?.available !== false)
+  const onlineSearching = useAppStore((s) => s.online.searchState === 'searching')
+  const platform = useAppStore((s) => s.online.platform)
+  const onlineReady = useAppStore((s) => s.ytDlp?.available !== false)
 
   function changeQuery(value: string) {
     setQuery(value)
-    if (!value.trim()) clearYouTubeSearch()
+    if (!value.trim()) clearOnlineSearch()
   }
 
   return (
@@ -48,7 +49,7 @@ export function Header() {
             {scanState === 'scanning' && (
               <Activity>scanning... {liveCount > 0 && `${liveCount} files`}</Activity>
             )}
-            {youtubeSearching && <Activity>searching youtube...</Activity>}
+            {onlineSearching && <Activity>searching {platform}...</Activity>}
           </div>
 
           {/* search row */}
@@ -59,10 +60,10 @@ export function Header() {
               value={query}
               onChange={(e) => changeQuery(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter') searchYouTube(query)
+                if (e.key === 'Enter') searchOnlineNow(query)
               }}
               placeholder={
-                youtubeReady ? 'search library · enter to search youtube' : 'search library'
+                onlineReady ? `search library · enter to search ${platform}` : 'search library'
               }
               // no autofill, spellcheck or OS text suggestions while typing a search
               autoComplete="off"

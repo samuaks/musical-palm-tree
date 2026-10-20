@@ -8,12 +8,14 @@ import {
   OnlineSearchState,
   YtDlpStatus,
   DownloadStatus,
+  Platform,
 } from './types'
 
 type Theme = 'dark' | 'light'
 
 const COLLAPSED_KEY = 'playmusic-collapsed'
 const ONLINE_VIDEO_KEY = 'playmusic-online-video'
+const ONLINE_PLATFORM_KEY = 'playmusic-online-platform'
 /** From when the app had separate Local/Online spaces; cleared at startup. */
 const LEGACY_ACTIVE_SPACE_KEY = 'playmusic-active-space'
 
@@ -30,21 +32,22 @@ interface LibraryState {
   collapsed: Set<string>
 }
 
-interface YouTubeState {
+interface OnlineState {
+  platform: Platform // the ONLINE tab Enter searches (persisted)
   results: OnlineSearchResult[]
   searchedQuery: string | null // the query `results` belong to
   searchState: OnlineSearchState
   searchError: string | null
   video: boolean // play online tracks with picture (persisted)
-  downloads: Record<string, DownloadStatus> // keyed by downloadKey(videoId, kind)
+  downloads: Record<string, DownloadStatus> // keyed by downloadKey(platform, videoId, kind)
 }
 
 interface AppState {
-  // one search box: filters the library as you type, searches YouTube on Enter
+  // one search box: filters the library as you type, searches online (YouTube/Twitch) on Enter
   query: string
 
   library: LibraryState
-  youtube: YouTubeState
+  online: OnlineState
 
   // playback state (queue is the single source of truth)
   queue: Track[]
@@ -81,12 +84,13 @@ interface AppState {
   setLibraryDuration: (path: string, duration: number) => void
   toggleLibraryCollapsed: (key: string) => void
 
-  // youtube actions
-  setYouTubeResults: (query: string, results: OnlineSearchResult[]) => void
-  setYouTubeSearchState: (state: OnlineSearchState) => void
-  setYouTubeSearchError: (error: string | null) => void
-  clearYouTubeSearch: () => void
-  setYouTubeVideo: (video: boolean) => void
+  // online actions
+  setOnlineResults: (query: string, results: OnlineSearchResult[]) => void
+  setOnlineSearchState: (state: OnlineSearchState) => void
+  setOnlineSearchError: (error: string | null) => void
+  clearOnlineSearch: () => void
+  setOnlineVideo: (video: boolean) => void
+  setOnlinePlatform: (platform: Platform) => void
   setDownload: (key: string, status: DownloadStatus) => void
   setDownloadPercent: (key: string, percent: number | null) => void
 }
@@ -94,8 +98,8 @@ interface AppState {
 export const useAppStore = create<AppState>((set) => {
   const setLibrary = (patch: (s: AppState) => Partial<LibraryState>) =>
     set((s) => ({ library: { ...s.library, ...patch(s) } }))
-  const setYouTube = (patch: (s: AppState) => Partial<YouTubeState>) =>
-    set((s) => ({ youtube: { ...s.youtube, ...patch(s) } }))
+  const setOnline = (patch: (s: AppState) => Partial<OnlineState>) =>
+    set((s) => ({ online: { ...s.online, ...patch(s) } }))
 
   return {
     query: '',
@@ -117,7 +121,8 @@ export const useAppStore = create<AppState>((set) => {
       durations: {},
       collapsed: loadCollapsed(),
     },
-    youtube: {
+    online: {
+      platform: loadOnlinePlatform(),
       results: [],
       searchedQuery: null,
       searchState: 'idle',
@@ -170,27 +175,38 @@ export const useAppStore = create<AppState>((set) => {
         return { collapsed }
       }),
 
-    setYouTubeResults: (searchedQuery, results) => setYouTube(() => ({ searchedQuery, results })),
-    setYouTubeSearchState: (searchState) => setYouTube(() => ({ searchState })),
-    setYouTubeSearchError: (searchError) => setYouTube(() => ({ searchError })),
-    clearYouTubeSearch: () =>
-      setYouTube(() => ({
+    setOnlineResults: (searchedQuery, results) => setOnline(() => ({ searchedQuery, results })),
+    setOnlineSearchState: (searchState) => setOnline(() => ({ searchState })),
+    setOnlineSearchError: (searchError) => setOnline(() => ({ searchError })),
+    clearOnlineSearch: () =>
+      setOnline(() => ({
         results: [],
         searchedQuery: null,
         searchState: 'idle',
         searchError: null,
       })),
-    setYouTubeVideo: (video) => {
+    setOnlineVideo: (video) => {
       localStorage.setItem(ONLINE_VIDEO_KEY, String(video))
-      setYouTube(() => ({ video }))
+      setOnline(() => ({ video }))
+    },
+    // Results belong to one platform, so switching tabs drops them.
+    setOnlinePlatform: (platform) => {
+      localStorage.setItem(ONLINE_PLATFORM_KEY, platform)
+      setOnline(() => ({
+        platform,
+        results: [],
+        searchedQuery: null,
+        searchState: 'idle',
+        searchError: null,
+      }))
     },
     setDownload: (key, status) =>
-      setYouTube((s) => ({ downloads: { ...s.youtube.downloads, [key]: status } })),
+      setOnline((s) => ({ downloads: { ...s.online.downloads, [key]: status } })),
     setDownloadPercent: (key, percent) =>
-      setYouTube((s) => {
-        const current = s.youtube.downloads[key]
+      setOnline((s) => {
+        const current = s.online.downloads[key]
         if (current?.state !== 'downloading') return {}
-        return { downloads: { ...s.youtube.downloads, [key]: { ...current, percent } } }
+        return { downloads: { ...s.online.downloads, [key]: { ...current, percent } } }
       }),
   }
 })
@@ -216,6 +232,11 @@ if (typeof window !== 'undefined') {
 export const selectCurrentTrack = (s: ReturnType<typeof useAppStore.getState>): Track | null => {
   if (s.queueIndex < 0 || s.queueIndex >= s.queue.length) return null
   return s.queue[s.queueIndex]
+}
+
+function loadOnlinePlatform(): Platform {
+  if (typeof window === 'undefined') return 'youtube'
+  return localStorage.getItem(ONLINE_PLATFORM_KEY) === 'twitch' ? 'twitch' : 'youtube'
 }
 
 function loadOnlineVideo(): boolean {

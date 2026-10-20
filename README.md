@@ -2,8 +2,8 @@
 
 A desktop media player for the music and videos already on your computer, built with Tauri, React and
 Rust. It finds media in your usual folders, groups it by folder and album, and plays it with a
-waveform-based player. The same search box can also search YouTube (with the optional yt-dlp), to
-stream results or download them into your library.
+waveform-based player. The same search box can also search YouTube and list Twitch VODs (with the
+optional yt-dlp), to stream them or download them into your library.
 
 It's the desktop companion to [PlayMusic](https://github.com/samuaks/playmusic), a Go/Bubble Tea
 terminal player, and is meant as a learning-friendly codebase (the repository is named
@@ -27,12 +27,12 @@ terminal player, and is meant as a learning-friendly codebase (the repository is
 **Player**
 
 - Plays audio and video. Next/previous follow the list the track was picked from (library order,
-  or the YouTube results), and the next track starts when one ends.
+  or the online results), and the next track starts when one ends.
 - Cover art in the list and the player bar: the picture embedded in the file (mp3, flac, ogg, m4a),
-  or else a `cover`, `folder`, `front` or `album` image (jpg/png) in the track's folder. YouTube
-  thumbnails for online tracks. Tracks without art show a music or video placeholder, and library
-  tracks and YouTube results are listed the same way (downloaded files without the `[id]` that
-  their file names carry).
+  or else a `cover`, `folder`, `front` or `album` image (jpg/png) in the track's folder. YouTube and
+  Twitch thumbnails for online tracks. Tracks without art show a music or video placeholder, and
+  library tracks and online results are listed the same way (downloaded files without the `[id]`
+  that their file names carry).
 - Waveform of the whole track in the player bar: click to seek, hover to preview the position. It's
   decoded in Rust in the background and cached, so replaying a track shows it instantly. Until it's
   ready, and for tracks that have none (online streams, unsupported codecs), a plain progress line
@@ -40,14 +40,21 @@ terminal player, and is meant as a learning-friendly codebase (the repository is
 - Videos play in a resizable pane on the right; fullscreen with `F`, a double-click, or the
   fullscreen button. The player bar can be resized too.
 
-**YouTube (optional)**
+**YouTube and Twitch (optional)**
 
-- Press Enter in the search box to also search YouTube (top 20 results); they're listed under
-  your library's matches. Streaming goes through [yt-dlp](https://github.com/yt-dlp/yt-dlp):
-  video up to 1080p in the video pane, or audio only with the video button in the player bar.
-  Not needed for local files; see [YouTube search](#youtube-search-optional) below.
-- Download a result's audio (m4a, into `~/Music/YouTube`) or video (mp4, into `~/Videos/YouTube`)
-  from the buttons on its row; it shows up in your library right away.
+- Press Enter in the search box to also search online; results are listed under your library's
+  matches, in an ONLINE section with **youtube** and **twitch** tabs:
+  - **youtube**: a search (top 20 results).
+  - **twitch**: type a channel name to list its 20 most recent VODs (Twitch itself can't be
+    searched).
+  - Pasting a YouTube or Twitch link opens that video (or channel) on either tab.
+- Streaming goes through [yt-dlp](https://github.com/yt-dlp/yt-dlp): video up to 1080p (Twitch:
+  720p) in the video pane, or audio only with the video button in the player bar. Not needed for
+  local files; see [Online search](#online-search-optional) below.
+- Download a result's audio (m4a) or video (mp4) from the buttons on its row, into
+  `~/Music/YouTube` / `~/Videos/YouTube` or `~/Music/Twitch` / `~/Videos/Twitch`; it shows up in
+  your library right away. Twitch VODs run for hours: audio is roughly 60–90 MB per hour, 720p
+  video about 1.4 GB per hour.
 
 **App**
 
@@ -61,7 +68,7 @@ terminal player, and is meant as a learning-friendly codebase (the repository is
 <sub>Screenshots are from a Linux build with a generated demo library, which is why durations show
 `--:--` (see [Known limitations](#known-limitations)). They predate the single main view: the
 Local/Online sidebar they show has been replaced by one search box, and yt-dlp is now offered in
-the YOUTUBE section under the library.</sub>
+the ONLINE section under the library.</sub>
 
 ## Keyboard shortcuts
 
@@ -122,13 +129,14 @@ cargo clippy --all-targets
 
 There's no CI for tests yet, so run these before opening a pull request.
 
-## YouTube search (optional)
+## Online search (optional)
 
-Searching YouTube needs yt-dlp. The easiest way to get it is in the app: type something in the
-search box, and the YOUTUBE section under your library offers **download yt-dlp**. playmusic
-downloads the official standalone build for your platform, checks it against the release's
-`SHA2-256SUMS`, and stores it in its app data folder (no admin rights needed). It then checks for a newer yt-dlp once a day, and right away if a search or stream
-fails, since YouTube changes regularly break older versions.
+Searching YouTube and listing Twitch VODs needs yt-dlp. The easiest way to get it is in the app:
+type something in the search box, and the ONLINE section under your library offers **download
+yt-dlp**. playmusic downloads the official standalone build for your platform, checks it against
+the release's `SHA2-256SUMS`, and stores it in its app data folder (no admin rights needed). It then
+checks for a newer yt-dlp once a day, and right away if a search or stream fails, since YouTube
+changes regularly break older versions.
 
 - **Release installers** already include yt-dlp. When that bundled copy falls behind, playmusic
   downloads the newer one the same way and uses it instead.
@@ -138,9 +146,10 @@ fails, since YouTube changes regularly break older versions.
   and build with `bun run tauri build --config src-tauri/tauri.bundle-yt-dlp.conf.json`.
 
 Downloads work without anything else, but with [ffmpeg](https://ffmpeg.org) installed
-(`winget install Gyan.FFmpeg`, `brew install ffmpeg`, `apt install ffmpeg`) they're better: video
-up to 1080p instead of 360p, and title, artist and cover art embedded in the files. playmusic finds
-ffmpeg on your `PATH` (or in Homebrew's folders) at startup.
+(`winget install Gyan.FFmpeg`, `brew install ffmpeg`, `apt install ffmpeg`) they're better: YouTube
+video up to 1080p instead of 360p, and title, artist and cover art embedded in the files. playmusic
+finds ffmpeg on your `PATH` (or in Homebrew's folders) at startup. Twitch downloads get the same
+720p either way.
 
 ## Releases
 

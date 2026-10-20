@@ -1,6 +1,8 @@
-//! Downloads YouTube audio or video into the scanned folders, so it shows up in the local
-//! library: `~/Music/YouTube` and `~/Videos/YouTube` (album "YouTube").
+//! Downloads YouTube or Twitch audio and video into the scanned folders, so they show up in the
+//! local library: `~/{Music,Videos}/YouTube` and `~/{Music,Videos}/Twitch` (albums "YouTube" and
+//! "Twitch").
 
+use crate::online::{media_url, Platform};
 use crate::ytdlp;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
@@ -22,6 +24,7 @@ pub struct Downloaded {
 
 #[derive(Serialize, Clone)]
 struct DownloadProgress {
+    platform: Platform,
     video_id: String,
     kind: Kind,
     downloaded: u64,
@@ -38,21 +41,27 @@ const EXTS: [&str; 2] = ["m4a", "mp4"];
 #[tauri::command]
 pub async fn download_media(
     app: AppHandle,
+    platform: Platform,
     video_id: String,
     kind: Kind,
 ) -> Result<Downloaded, String> {
-    if !is_video_id(&video_id) {
-        return Err(format!("not a YouTube video id: {video_id}"));
-    }
+    let url =
+        media_url(platform, &video_id).ok_or_else(|| format!("not a video id: {video_id}"))?;
+    let file_id = file_id(platform, &video_id);
     let home = dirs::home_dir().ok_or("no home directory")?;
-    let dir = target_dir(&home, kind);
-    if let Some(path) = find_existing(&dir, &video_id) {
+    let dir = target_dir(&home, platform, kind);
+    if let Some(path) = find_existing(&dir, &file_id) {
         return Ok(downloaded(path, kind));
     }
     std::fs::create_dir_all(&dir).map_err(|e| format!("couldn't create {}: {e}", dir.display()))?;
 
-    let url = format!("https://www.youtube.com/watch?v={video_id}");
-    let args = download_args(kind, ytdlp::locate_ffmpeg().as_deref(), &dir, &url);
+    let args = download_args(
+        platform,
+        kind,
+        ytdlp::locate_ffmpeg().as_deref(),
+        &dir,
+        &url,
+    );
     let args: Vec<&str> = args.iter().map(String::as_str).collect();
 
     let mut last_emit: Option<Instant> = None;
@@ -66,6 +75,7 @@ pub async fn download_media(
         }
         last_emit = Some(Instant::now());
         let progress = DownloadProgress {
+            platform,
             video_id: video_id.clone(),
             kind,
             downloaded,
@@ -77,7 +87,7 @@ pub async fn download_media(
 
     // Found by name rather than from yt-dlp's printed path, which Windows consoles can mangle
     // for non-ASCII titles.
-    find_existing(&dir, &video_id)
+    find_existing(&dir, &file_id)
         .map(|path| downloaded(path, kind))
         .ok_or_else(|| "yt-dlp finished but the downloaded file wasn't found".to_string())
 }
@@ -89,23 +99,26 @@ fn downloaded(path: PathBuf, kind: Kind) -> Downloaded {
     }
 }
 
-/// YouTube ids are letters, digits, `-` and `_`. Checked because the id ends up in a URL and
-/// a file name.
-fn is_video_id(id: &str) -> bool {
-    !id.is_empty()
-        && id.len() <= 64
-        && id
-            .chars()
-            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+/// The id as yt-dlp writes it into file names (`%(id)s`): Twitch VOD ids get a `v` prefix.
+fn file_id(platform: Platform, id: &str) -> String {
+    match platform {
+        Platform::Youtube => id.to_string(),
+        Platform::Twitch => format!("v{}", id.trim_start_matches('v')),
+    }
 }
 
-/// One level below an allowed scan dir, so the scanner lists downloads as album "YouTube".
-fn target_dir(home: &Path, kind: Kind) -> PathBuf {
+/// One level below an allowed scan dir, so the scanner lists downloads as album "YouTube" or
+/// "Twitch".
+fn target_dir(home: &Path, platform: Platform, kind: Kind) -> PathBuf {
     let top = match kind {
         Kind::Audio => "Music",
         Kind::Video => "Videos",
     };
-    home.join(top).join("YouTube")
+    let album = match platform {
+        Platform::Youtube => "YouTube",
+        Platform::Twitch => "Twitch",
+    };
+    home.join(top).join(album)
 }
 
 /// A finished download of `video_id` in `dir`: saved as `<title> [<id>].<ext>`. Partial files
@@ -125,10 +138,29 @@ fn find_existing(dir: &Path, video_id: &str) -> Option<PathBuf> {
         })
 }
 
-/// yt-dlp arguments for a download. With ffmpeg: up to 1080p video merged with its audio, and
-/// title/artist/cover embedded. Without it: the m4a audio stream as is, or the 360p stream that
-/// has both picture and sound (format 18).
-fn download_args(kind: Kind, ffmpeg: Option<&Path>, dir: &Path, url: &str) -> Vec<String> {
+/// yt-dlp arguments for a download.
+///
+/// YouTube, with ffmpeg: up to 1080p video merged with its audio, and title/artist/cover
+/// embedded. Without it: the m4a audio stream as is, or the 360p stream that has both picture
+/// and sound (format 18).
+///
+/// Twitch only serves HLS, and every quality has sound, so video is one stream up to 720p
+/// (~1.3 GB per hour of VOD) and audio is the Audio_Only rendition (~90 MB per hour). VODs are
+/// thousands of 10 s fragments, fetched 8 at a time.
+fn download_args(
+    platform: Platform,
+    kind: Kind,
+    ffmpeg: Option<&Path>,
+    dir: &Path,
+    url: &str,
+) -> Vec<String> {
+    // Twitch's Audio_Only is already AAC in MP4; without ffmpeg to remux it, name it .m4a so it
+    // isn't listed as a video.
+    let output = if platform == Platform::Twitch && kind == Kind::Audio && ffmpeg.is_none() {
+        "%(title)s [%(id)s].m4a"
+    } else {
+        "%(title)s [%(id)s].%(ext)s"
+    };
     let mut args: Vec<String> = [
         "--no-playlist",
         "--no-warnings",
@@ -137,23 +169,32 @@ fn download_args(kind: Kind, ffmpeg: Option<&Path>, dir: &Path, url: &str) -> Ve
         "download:PROGRESS %(progress.downloaded_bytes)s %(progress.total_bytes)s \
          %(progress.total_bytes_estimate)s",
         "-o",
-        "%(title)s [%(id)s].%(ext)s",
+        output,
     ]
     .map(String::from)
     .into();
     args.extend(["-P".into(), dir.to_string_lossy().into_owned()]);
 
-    let format: &[&str] = match (kind, ffmpeg.is_some()) {
-        (Kind::Audio, true) => &["-f", "ba[ext=m4a]/ba", "-x", "--audio-format", "m4a"],
+    let format: &[&str] = match (platform, kind, ffmpeg.is_some()) {
+        (Platform::Youtube, Kind::Audio, true) => {
+            &["-f", "ba[ext=m4a]/ba", "-x", "--audio-format", "m4a"]
+        }
         // Only m4a: a webm/opus file would be listed as a video.
-        (Kind::Audio, false) => &["-f", "ba[ext=m4a]"],
-        (Kind::Video, true) => &[
+        (Platform::Youtube, Kind::Audio, false) => &["-f", "ba[ext=m4a]"],
+        (Platform::Youtube, Kind::Video, true) => &[
             "-f",
             "bv*[height<=1080][vcodec^=avc1]+ba[ext=m4a]/b[ext=mp4]",
             "--merge-output-format",
             "mp4",
         ],
-        (Kind::Video, false) => &["-f", "18/b[ext=mp4][vcodec!=none][acodec!=none]"],
+        (Platform::Youtube, Kind::Video, false) => {
+            &["-f", "18/b[ext=mp4][vcodec!=none][acodec!=none]"]
+        }
+        (Platform::Twitch, Kind::Audio, true) => {
+            &["-N", "8", "-f", "ba/b", "-x", "--audio-format", "m4a"]
+        }
+        (Platform::Twitch, Kind::Audio, false) => &["-N", "8", "-f", "ba/b"],
+        (Platform::Twitch, Kind::Video, _) => &["-N", "8", "-f", "b[height<=720]/b"],
     };
     args.extend(format.iter().map(|s| s.to_string()));
 
@@ -195,10 +236,21 @@ mod tests {
 
     fn args(kind: Kind, ffmpeg: Option<&Path>) -> Vec<String> {
         download_args(
+            Platform::Youtube,
             kind,
             ffmpeg,
             Path::new("/home/u/Music/YouTube"),
             "https://y/watch?v=abc",
+        )
+    }
+
+    fn twitch_args(kind: Kind, ffmpeg: Option<&Path>) -> Vec<String> {
+        download_args(
+            Platform::Twitch,
+            kind,
+            ffmpeg,
+            Path::new("/home/u/Music/Twitch"),
+            "https://www.twitch.tv/videos/1",
         )
     }
 
@@ -280,24 +332,54 @@ mod tests {
     }
 
     #[test]
-    fn video_ids_are_validated() {
-        assert!(is_video_id("dQw4w9WgXcQ"));
-        assert!(is_video_id("a-b_c"));
-        assert!(!is_video_id(""));
-        assert!(!is_video_id("--exec rm"));
-        assert!(!is_video_id("../x"));
+    fn twitch_audio_is_the_audio_only_rendition_as_m4a() {
+        let a = twitch_args(Kind::Audio, Some(Path::new("ffmpeg")));
+        assert_eq!(value_of(&a, "-f"), Some("ba/b"));
+        assert_eq!(value_of(&a, "--audio-format"), Some("m4a"));
+        assert_eq!(value_of(&a, "-o"), Some("%(title)s [%(id)s].%(ext)s"));
+        assert_eq!(value_of(&a, "-N"), Some("8"), "fragments in parallel");
+
+        // Without ffmpeg there's no remux, so the .m4a name is set directly
+        let a = twitch_args(Kind::Audio, None);
+        assert_eq!(value_of(&a, "-o"), Some("%(title)s [%(id)s].m4a"));
+        assert!(!a.contains(&"-x".to_string()));
     }
 
     #[test]
-    fn audio_goes_to_music_and_video_to_videos() {
+    fn twitch_video_is_one_stream_up_to_720p() {
+        for ffmpeg in [None, Some(Path::new("ffmpeg"))] {
+            let a = twitch_args(Kind::Video, ffmpeg);
+            assert_eq!(value_of(&a, "-f"), Some("b[height<=720]/b"));
+            assert!(!a.contains(&"--merge-output-format".to_string()));
+            assert_eq!(value_of(&a, "-o"), Some("%(title)s [%(id)s].%(ext)s"));
+        }
+    }
+
+    #[test]
+    fn twitch_file_ids_have_the_v_prefix() {
+        assert_eq!(file_id(Platform::Twitch, "2905135575"), "v2905135575");
+        assert_eq!(file_id(Platform::Twitch, "v2905135575"), "v2905135575");
+        assert_eq!(file_id(Platform::Youtube, "dQw4w9WgXcQ"), "dQw4w9WgXcQ");
+    }
+
+    #[test]
+    fn downloads_go_to_an_album_per_platform() {
         let home = Path::new("/home/u");
         assert_eq!(
-            target_dir(home, Kind::Audio),
+            target_dir(home, Platform::Youtube, Kind::Audio),
             home.join("Music").join("YouTube")
         );
         assert_eq!(
-            target_dir(home, Kind::Video),
+            target_dir(home, Platform::Youtube, Kind::Video),
             home.join("Videos").join("YouTube")
+        );
+        assert_eq!(
+            target_dir(home, Platform::Twitch, Kind::Audio),
+            home.join("Music").join("Twitch")
+        );
+        assert_eq!(
+            target_dir(home, Platform::Twitch, Kind::Video),
+            home.join("Videos").join("Twitch")
         );
     }
 }

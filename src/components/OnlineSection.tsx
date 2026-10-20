@@ -7,26 +7,54 @@ import {
   downloadMedia,
   installYtDlp,
   resultToTrack,
-  searchYouTube,
+  searchOnlineNow,
+  selectPlatform,
   ytDlpStatus,
 } from '../api/online'
 import { scanLibrary } from '../api/local'
-import { DownloadKind, OnlineSearchResult, YtDlpDownloadProgress } from '../types'
+import { DownloadKind, OnlineSearchResult, Platform, YtDlpDownloadProgress } from '../types'
 import { SourceHeader } from './SourceHeader'
 import { TrackRow } from './TrackRow'
 import { TrackCover } from './TrackCover'
-import { formatDuration } from '../utils/format'
+import { formatDuration, formatRelative, formatViews } from '../utils/format'
+
+const PLATFORMS: Platform[] = ['youtube', 'twitch']
+
+/** A pasted link is opened directly (see `classify` in online.rs), whichever tab is active. */
+function looksLikeLink(query: string): boolean {
+  return /^(https?:\/\/|www\.)|youtu\.be\/|youtube\.com\/|twitch\.tv\//i.test(query)
+}
+
+/** What the search row and status lines say, per platform. */
+function wording(platform: Platform, query: string) {
+  if (looksLikeLink(query)) {
+    return { action: `open "${query}"`, running: `opening "${query}"...`, empty: 'nothing found' }
+  }
+  return platform === 'twitch'
+    ? {
+        action: `list twitch vods from "${query}"`,
+        running: `listing twitch vods from "${query}"...`,
+        empty: `no vods found for "${query}"`,
+      }
+    : {
+        action: `search youtube for "${query}"`,
+        running: `searching youtube for "${query}"...`,
+        empty: `no youtube results for "${query}"`,
+      }
+}
 
 /**
- * The YOUTUBE part of the main view, shown while the search box isn't empty. YouTube is only
- * searched on Enter (or by clicking the search row), so filtering the library never calls yt-dlp.
+ * The ONLINE part of the main view, shown while the search box isn't empty. Tabs pick YouTube
+ * (text search) or Twitch (a channel's recent VODs). Searched only on Enter (or by clicking the
+ * search row), so filtering the library never calls yt-dlp.
  */
-export function YouTubeSection() {
+export function OnlineSection() {
   const query = useAppStore((s) => s.query.trim())
-  const results = useAppStore((s) => s.youtube.results)
-  const searchedQuery = useAppStore((s) => s.youtube.searchedQuery)
-  const searchState = useAppStore((s) => s.youtube.searchState)
-  const searchError = useAppStore((s) => s.youtube.searchError)
+  const platform = useAppStore((s) => s.online.platform)
+  const results = useAppStore((s) => s.online.results)
+  const searchedQuery = useAppStore((s) => s.online.searchedQuery)
+  const searchState = useAppStore((s) => s.online.searchState)
+  const searchError = useAppStore((s) => s.online.searchError)
   const playTrackFromList = useAppStore((s) => s.playTrackFromList)
   const ytDlp = useAppStore((s) => s.ytDlp)
 
@@ -41,10 +69,27 @@ export function YouTubeSection() {
 
   const searching = searchState === 'searching'
   const stale = searchedQuery !== query
+  const words = wording(platform, query)
 
   return (
     <div className="pb-4">
-      <SourceHeader name="youtube" count={searchedQuery ? results.length : undefined} />
+      <SourceHeader name="online" count={searchedQuery ? results.length : undefined}>
+        <div className="flex items-baseline gap-3 ml-2">
+          {PLATFORMS.map((p) => (
+            <button
+              key={p}
+              onClick={() => p !== platform && selectPlatform(p)}
+              className={`text-xs font-mono transition-colors ${
+                p === platform
+                  ? 'text-app-accent underline underline-offset-4'
+                  : 'text-app-muted hover:text-app-text'
+              }`}
+            >
+              {p}
+            </button>
+          ))}
+        </div>
+      </SourceHeader>
 
       {ytDlp && !ytDlp.available ? (
         <EnableOnline />
@@ -53,16 +98,16 @@ export function YouTubeSection() {
           {searching ? (
             <StatusRow>
               <Loader2 size={14} className="animate-spin text-app-accent" />
-              searching youtube for "{query}"...
+              {words.running}
             </StatusRow>
           ) : (
             stale && (
               <button
-                onClick={() => searchYouTube(query)}
+                onClick={() => searchOnlineNow(query)}
                 className="w-full flex items-center gap-3 px-6 py-2 text-left text-xs font-mono text-app-secondary hover:bg-app-hover hover:text-app-text transition-colors"
               >
                 <Search size={14} className="shrink-0" />
-                <span className="truncate">search youtube for "{query}"</span>
+                <span className="truncate">{words.action}</span>
                 <span className="ml-auto text-app-muted">⏎</span>
               </button>
             )
@@ -71,12 +116,12 @@ export function YouTubeSection() {
           {searchState === 'error' && (
             <StatusRow>
               <AlertCircle size={14} className="shrink-0" />
-              <span className="wrap-break-word">search failed: {searchError}</span>
+              <span className="wrap-break-word">{searchError}</span>
             </StatusRow>
           )}
 
           {searchState === 'done' && !stale && results.length === 0 && (
-            <StatusRow>no youtube results for "{query}"</StatusRow>
+            <StatusRow>{words.empty}</StatusRow>
           )}
 
           {results.length > 0 && (
@@ -103,12 +148,23 @@ function StatusRow({ children }: { children: ReactNode }) {
   )
 }
 
-/** A YouTube result, laid out like a library track; downloads sit before the duration. */
+/** An online result, laid out like a library track; downloads sit before the duration. */
 function ResultRow({ result, onPlay }: { result: OnlineSearchResult; onPlay: () => void }) {
   const current = useAppStore(selectCurrentTrack)
   const resolving = useAppStore((s) => s.resolving)
   const playing = useAppStore((s) => s.playing)
-  const isActive = current?.source === 'online' && current.videoId === result.video_id
+  const isActive =
+    current?.source === 'online' &&
+    current.platform === result.platform &&
+    current.videoId === result.video_id
+  const subtitle = [
+    result.uploader ?? 'Unknown',
+    result.view_count !== null && formatViews(result.view_count),
+  ]
+    .filter(Boolean)
+    .join(' · ')
+  // The date always shows; the channel and views shorten first
+  const age = result.timestamp !== null ? formatRelative(result.timestamp * 1000) : undefined
   return (
     <TrackRow
       dataPath={result.video_id}
@@ -123,13 +179,14 @@ function ResultRow({ result, onPlay }: { result: OnlineSearchResult; onPlay: () 
         />
       }
       title={result.title}
-      subtitle={result.uploader ?? 'Unknown'}
+      subtitle={subtitle}
+      subtitleEnd={age}
       duration={formatDuration(result.duration_secs)}
       onClick={onPlay}
       actions={
         <>
-          <DownloadButton videoId={result.video_id} kind="audio" />
-          <DownloadButton videoId={result.video_id} kind="video" />
+          <DownloadButton platform={result.platform} videoId={result.video_id} kind="audio" />
+          <DownloadButton platform={result.platform} videoId={result.video_id} kind="video" />
         </>
       }
     />
@@ -137,13 +194,22 @@ function ResultRow({ result, onPlay }: { result: OnlineSearchResult; onPlay: () 
 }
 
 /**
- * Saves a result into the library (audio → ~/Music/YouTube, video → ~/Videos/YouTube) and
- * rescans so it shows up under LIBRARY. Hidden until the row is hovered, unless it's
- * downloading, done or failed. Progress comes from `download_progress` (listened to in MainView).
+ * Saves a result into the library (audio → ~/Music/<YouTube|Twitch>, video →
+ * ~/Videos/<YouTube|Twitch>) and rescans so it shows up under LIBRARY. Hidden until the row is
+ * hovered, unless it's downloading, done or failed. Progress comes from `download_progress`
+ * (listened to in MainView).
  */
-function DownloadButton({ videoId, kind }: { videoId: string; kind: DownloadKind }) {
-  const key = downloadKey(videoId, kind)
-  const status = useAppStore((s) => s.youtube.downloads[key])
+function DownloadButton({
+  platform,
+  videoId,
+  kind,
+}: {
+  platform: Platform
+  videoId: string
+  kind: DownloadKind
+}) {
+  const key = downloadKey(platform, videoId, kind)
+  const status = useAppStore((s) => s.online.downloads[key])
   const ffmpeg = useAppStore((s) => s.ytDlp?.ffmpeg ?? false)
   const setDownload = useAppStore((s) => s.setDownload)
 
@@ -151,7 +217,7 @@ function DownloadButton({ videoId, kind }: { videoId: string; kind: DownloadKind
     if (status?.state === 'downloading') return
     setDownload(key, { state: 'downloading', percent: null })
     try {
-      const { path } = await downloadMedia(videoId, kind)
+      const { path } = await downloadMedia(platform, videoId, kind)
       setDownload(key, { state: 'done', percent: 100, path })
       scanLibrary()
     } catch (e) {
@@ -159,8 +225,17 @@ function DownloadButton({ videoId, kind }: { videoId: string; kind: DownloadKind
     }
   }
 
+  // Twitch VODs run for hours, so say roughly how big they get.
   const label =
-    kind === 'audio' ? 'audio' : ffmpeg ? 'video' : 'video (360p, install ffmpeg for HD)'
+    platform === 'twitch'
+      ? kind === 'audio'
+        ? 'audio (~90 MB per hour)'
+        : 'video up to 720p (~1.3 GB per hour)'
+      : kind === 'audio'
+        ? 'audio'
+        : ffmpeg
+          ? 'video'
+          : 'video (360p, install ffmpeg for HD)'
   const title =
     status?.state === 'downloading'
       ? `downloading ${kind}...`
@@ -229,7 +304,7 @@ function EnableOnline() {
   return (
     <div className="flex flex-col items-start gap-3 px-6 py-3 text-app-muted">
       <span className="text-xs font-mono max-w-md">
-        youtube search needs yt-dlp. playmusic can download it from github.com/yt-dlp/yt-dlp, verify
+        online search needs yt-dlp. playmusic can download it from github.com/yt-dlp/yt-dlp, verify
         its checksum, and keep it up to date for you.
       </span>
       {installing ? (

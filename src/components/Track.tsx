@@ -44,7 +44,9 @@ export function Track({ file, dirName, albumName }: TrackProps) {
 
   const isActive = currentTrack?.path == file.path
   const video = isVideo(file.ext)
-  const subtitle = [albumName, dirName, formatRelative(file.created_at)].filter(Boolean).join(' · ')
+  const subtitle = [albumName, dirName].filter(Boolean).join(' · ')
+  // The date always shows; album and folder shorten first
+  const added = formatRelative(file.created_at) || undefined
 
   function handleClick() {
     const idx = flatTracks.findIndex((t) => t.path === file.path)
@@ -68,6 +70,7 @@ export function Track({ file, dirName, albumName }: TrackProps) {
       }
       title={highlight(displayName(file.name), query)}
       subtitle={subtitle}
+      subtitleEnd={added}
       duration={formatDuration(duration)}
       onClick={handleClick}
     />

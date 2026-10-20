@@ -23,8 +23,8 @@ ideas, while using different stacks and interaction models.
 
 PlayMusic Desktop is a Tauri 2 desktop app with a React frontend and Rust backend.
 It has one main view: your local library, and a single search box that filters it as you
-type and searches YouTube (through the optional yt-dlp) when you press Enter. Local tracks
-and YouTube results share the same playback infrastructure.
+type and, when you press Enter, searches YouTube or lists a Twitch channel's VODs (through the
+optional yt-dlp). Local tracks and online results share the same playback infrastructure.
 
 ## How To Read This Project
 
@@ -32,8 +32,8 @@ If you are new to this codebase, start with:
 
 1. `src/App.tsx` - top-level layout and persistent player shell
 2. `src/components/Header.tsx` - library stats and the search box
-3. `src/components/MainView.tsx` - the library and YouTube sections
-4. `src/components/YouTubeSection.tsx` - YouTube results, playing and downloading
+3. `src/components/MainView.tsx` - the library and online sections
+4. `src/components/OnlineSection.tsx` - YouTube/Twitch results, playing and downloading
 5. `src/components/PlayerBar.tsx` - playback controls, waveform, and media elements
 6. `src/store.ts` - global Zustand state and queue model
 7. `src-tauri/src/lib.rs` - registered Rust commands
@@ -49,9 +49,9 @@ Rust, and Rust handles heavier filesystem and media work.
    player bar.
 2. The library is scanned at startup through the Rust `scan_media` command; scan progress
    streams back to React via Tauri events.
-3. Typing in the search box filters the library (Fuse.js). Pressing Enter also searches
-   YouTube; results appear in a YOUTUBE section under the library matches.
-4. Selecting a track (local or YouTube) updates the global queue in Zustand: the queue is the
+3. Typing in the search box filters the library (Fuse.js). Pressing Enter also searches the
+   selected online platform; results appear in an ONLINE section under the library matches.
+4. Selecting a track (local or online) updates the global queue in Zustand: the queue is the
    list it was picked from.
 5. `PlayerBar` owns playback controls, waveform display, and audio/video
    elements.
@@ -73,7 +73,7 @@ Rust, and Rust handles heavier filesystem and media work.
 ├────────────────────────────┬────────────────────┤
 │ MainView │ Video Pane │
 │ LIBRARY (filtered) │ (right side, when │
-│ YOUTUBE (while searching) │ a video plays) │
+│ ONLINE youtube|twitch │ a video plays) │
 ├────────────────────────────┴────────────────────┤
 │ Player Bar │
 └─────────────────────────────────────────────────┘
@@ -84,19 +84,30 @@ There's one search box (`query` in the store), in `Header`:
 
 - **Empty**: `MainView` shows the whole library (directories → albums → tracks).
 - **Typing**: `Library` filters with `filterDirs` (Fuse.js) and gets a `LIBRARY n` header.
-  Below it, `YouTubeSection` offers `search youtube for "…" ⏎`. YouTube isn't searched while
-  typing, so local lookups never call yt-dlp.
-- **Enter** (or clicking that row): `searchYouTube(query)` in `src/api/online.ts` runs
-  `search_online` and stores the results with the query they belong to (`searchedQuery`). If
-  the query changes afterwards, the old results stay under a `results for "…"` label until
-  the next search. A newer search always wins over a slower older one.
-- **Clearing** the box drops the YouTube results (`clearYouTubeSearch`).
+  Below it, `OnlineSection` (with **youtube** / **twitch** tabs, `online.platform`) offers
+  `search youtube for "…" ⏎` or `list twitch vods from "…" ⏎`. Nothing online is searched
+  while typing, so local lookups never call yt-dlp.
+- **Enter** (or clicking that row): `searchOnlineNow(query)` in `src/api/online.ts` runs
+  `search_online(query, platform)` and stores the results with the query they belong to
+  (`searchedQuery`). If the query changes afterwards, the old results stay under a
+  `results for "…"` label until the next search. A newer search always wins over a slower
+  older one, and switching tabs (`selectPlatform`) drops the results.
+- **Clearing** the box drops the online results (`clearOnlineSearch`).
+
+What a query means is decided in Rust (`classify` in `online.rs`):
+- a pasted YouTube link (`watch`, `shorts`, `youtu.be`, music.youtube) or Twitch VOD link
+  (`twitch.tv/videos/<id>`) → that one video, on either tab
+- a Twitch channel link, or a channel name on the twitch tab → the channel's 20 most recent
+  VODs (`twitch.tv/<name>/videos?filter=archives&sort=time`), newest first. yt-dlp can't search
+  Twitch, and its channel list has no dates: the broadcast start is read from each thumbnail URL
+  (`…_<unix time>//thumb/…`), and the list is kept sorted by VOD id, which only goes up.
+- anything else on the youtube tab → `ytsearch20:`
 
 Playback doesn't care where a track came from: the player bar, video pane, volume and current
 track live at the root, and the queue is whatever list the track was picked from (library
-order, or the YouTube results).
+order, or the online results).
 
-Until yt-dlp is installed, the YOUTUBE section shows the install panel instead of results; it's
+Until yt-dlp is installed, the ONLINE section shows the install panel instead of results; it's
 hidden entirely on platforms where the app can't install yt-dlp.
 
 ## State Architecture (Zustand)
@@ -105,7 +116,7 @@ Single store at `src/store.ts`, with state grouped by source:
 
 ### Root-level
 
-- `query` — the search box: filters the library, searched on YouTube on Enter
+- `query` — the search box: filters the library, searched online (YouTube or Twitch) on Enter
 - `queue` / `queueIndex` — the play queue, the single source of truth for playback;
   the current track (local or online) is derived via `selectCurrentTrack`
 - `playing` — playback state (true/false)
@@ -124,11 +135,12 @@ Single store at `src/store.ts`, with state grouped by source:
 - `library.durations` — `Record<path, seconds>` filled lazily
 - `library.collapsed` — `Set<string>` of collapsed album keys
 
-### YouTube (`youtube.*`)
+### Online (`online.*`)
 
-- `youtube.results` / `searchedQuery` / `searchState` / `searchError` — the last search
-- `youtube.video` — play online tracks with video (persisted, default on)
-- `youtube.downloads` — download status per `videoId:kind` (state, percent, path/error)
+- `online.platform` — the ONLINE tab, `'youtube' | 'twitch'` (persisted)
+- `online.results` / `searchedQuery` / `searchState` / `searchError` — the last search
+- `online.video` — play online tracks with video (persisted, default on)
+- `online.downloads` — download status per `platform:videoId:kind` (state, percent, path/error)
 
 ### Selective subscriptions
 
@@ -142,14 +154,14 @@ const dirs = useAppStore((s) => s.library.dirs)
 
 App.tsx
 ├── Titlebar
-├── Header ← stats, search box (Enter searches YouTube), ThemeToggle
+├── Header ← stats, search box (Enter searches online), ThemeToggle
 ├── (main row)
 │ ├── MainView ← runs the scan, durations and download-progress listeners
 │ │ ├── ScrollToActive
 │ │ ├── Library ← LIBRARY (filtered by the query)
 │ │ │ └── TrackList
 │ │ │ └── Track (×N) → TrackRow + TrackCover (lazy cover)
-│ │ └── YouTubeSection ← YOUTUBE (while the query isn't empty)
+│ │ └── OnlineSection ← ONLINE + youtube/twitch tabs (while the query isn't empty)
 │ │ └── ResultRow (×N) → TrackRow + TrackCover + DownloadButtons
 │ └── VideoPane ← portal target for video element
 └── PlayerBar
@@ -172,7 +184,7 @@ ytdlp.rs ← yt_dlp_status / install_yt_dlp, finds/updates/runs yt-dlp
 | `scan_media`        | Recursive scan, emits progress events      | async      |
 | `generate_waveform` | Whole-track loudness overview (cached)     | async      |
 | `cover_art`         | Cover thumbnail for one track, as data URL | async      |
-| `search_online`     | yt-dlp `ytsearch20:` flat search           | async      |
+| `search_online`     | YouTube search / Twitch channel VODs / link | async      |
 | `resolve_stream`    | yt-dlp lookup of audio (+ video) URLs      | async      |
 | `download_media`    | Download audio/video into the library      | async      |
 | `yt_dlp_status`     | yt-dlp found / installable, ffmpeg found   | sync       |
@@ -196,7 +208,7 @@ most every 250 ms.
 Shown in the player bar for the current track and in every list row, so it's produced on demand
 rather than during the scan. Both go through `loadCover(path)` in `src/hooks/useCoverArt.ts`,
 which calls `cover_art(path)`, shares lookups already in flight, and keeps up to 400 results in
-memory. Online tracks use their YouTube thumbnail URL.
+memory. Online tracks use their YouTube or Twitch thumbnail URL.
 
 - **List rows** (`useRowCover`): one shared `IntersectionObserver`, rooted at MainView's scrolling
   list (`#main-scroll`) with a 400 px margin, looks a row's cover up only once it's near view. A
@@ -237,11 +249,19 @@ memory. Online tracks use their YouTube thumbnail URL.
 
 ### Online Playback (`online.rs`, `useAudioPlayer`, `useVideoSync`)
 
-YouTube only offers picture and sound in one stream at 360p (format 18); everything sharper is
-a video-only stream. So `resolve_stream(video_id, video)` asks yt-dlp (`--dump-json -f ...`) for
-two https URLs: a video-only stream up to 1080p (avc1 preferred, since every WebView decodes it;
-no HLS, which WebView2 can't play) and an m4a audio stream. With video off, or when there's no
-usable video stream, it returns audio only.
+`resolve_stream(platform, video_id, video)` asks yt-dlp (`--dump-json -f ...`) for two URLs:
+one with the picture and one with the sound. With video off, or when there's no usable picture
+stream, it returns sound only.
+
+- **YouTube** only offers picture and sound in one stream at 360p (format 18); everything
+  sharper is video-only. So: a video-only https stream up to 1080p (avc1 preferred, since every
+  WebView decodes it; YouTube's HLS formats are skipped) and an m4a audio stream.
+- **Twitch** serves only HLS (`m3u8`), and every quality also carries sound. The WebViews play
+  HLS natively (WebView2/Chromium, WKWebView), which matters because Twitch's CDN allows CORS
+  only for twitch.tv, so hls.js couldn't fetch it. `--audio-multistreams` pairs a ≤720p stream
+  with the `Audio_Only` rendition; the picture stream then plays muted like YouTube's.
+- In a pair, the picture is whichever entry has one (even if it has sound too), and the sound is
+  the other (`parse_resolved`).
 
 - The sound plays in the `<audio>` element, which stays the master: play, pause, seek, volume,
   `timeupdate` and `ended` all go through it, as for any audio track.
@@ -249,29 +269,35 @@ usable video stream, it returns audio only.
   mirrors play/pause/seek/rate onto it and pauses it while the audio buffers. Small drift
   (> 40 ms) is closed by running the video 10% faster or slower for a moment; more than 0.3 s
   snaps it to the audio's time. The audio is never paused for the video.
-- The player bar's video button toggles `youtube.video`; the current track is re-resolved
+- The player bar's video button toggles `online.video`; the current track is re-resolved
   and resumes where it was.
 - Stream URLs expire after a few hours. An `error` on either element re-resolves both and resumes
   (at most every 10 s).
 
 ### Downloads (`download.rs`)
 
-`download_media(video_id, kind)` saves a search result into a scanned folder, so it becomes a
-local track: audio as m4a in `~/Music/YouTube`, video as mp4 in `~/Videos/YouTube` (album
-"YouTube" in the library). Files are named `<title> [<id>].<ext>`; an existing file with that
-id is returned without downloading again.
+`download_media(platform, video_id, kind)` saves a search result into a scanned folder, so it
+becomes a local track: audio as m4a in `~/Music/<YouTube|Twitch>`, video as mp4 in
+`~/Videos/<YouTube|Twitch>` (albums "YouTube" and "Twitch" in the library). Files are named
+`<title> [<id>].<ext>` (Twitch ids look like `v2905135575`); an existing file with that id is
+returned without downloading again. Ids are validated per platform (`online::media_url`).
 
 - **ffmpeg is optional** (`ytdlp::locate_ffmpeg`: `PATH`, then Homebrew/pipx dirs). With it:
-  video up to 1080p (avc1 + m4a merged into mp4), and title/artist/cover embedded. Without it:
-  the m4a audio stream as is, or YouTube's 360p stream with picture and sound (format 18).
+  YouTube video up to 1080p (avc1 + m4a merged into mp4), and title/artist/cover embedded.
+  Without it: the m4a audio stream as is, or YouTube's 360p stream with picture and sound
+  (format 18).
+- **Twitch**: video is one ≤720p stream (it has sound, so nothing to merge; ~1.4 GB per hour),
+  audio the `Audio_Only` rendition (~60–90 MB per hour; without ffmpeg it's saved as `.m4a`
+  directly, since it's already AAC in MP4). VODs are thousands of 10 s HLS fragments, fetched 8
+  at a time (`-N 8`).
 - Runs through `ytdlp::run_streaming`, which reads yt-dlp's output line by line. A progress
   template prints `PROGRESS <downloaded> <total> <estimate>` lines, which become
-  `download_progress { video_id, kind, downloaded, total }` events (≤ 4/s). A video download
+  `download_progress { platform, video_id, kind, downloaded, total }` events (≤ 4/s). A video download
   reports its video and audio parts in turn.
 - The finished file is found by its `[<id>]` name rather than from yt-dlp's printed path, which
   Windows consoles can mangle for non-ASCII titles.
-- **Frontend**: `DownloadButton`s on each YouTube result row track their status in
-  `youtube.downloads` (progress is listened to in `MainView`). When a download lands, `scanLibrary()` (`api/local.ts`) rescans;
+- **Frontend**: `DownloadButton`s on each online result row track their status in
+  `online.downloads` (progress is listened to in `MainView`). When a download lands, `scanLibrary()` (`api/local.ts`) rescans;
   a call during a scan queues one more. Live `scan_progress` snapshots only fill an empty
   library, so a rescan doesn't flicker the list.
 
@@ -303,7 +329,7 @@ runs without it (local-only). `ytdlp.rs` owns finding, installing, updating and 
 - An `RwLock` keeps updates from replacing the binary while it runs, which Windows doesn't
   allow.
 - **Frontend**: `yt_dlp_status` returns `{ available, can_install, ffmpeg }`. `useOnlineAvailability`
-  calls it at startup. The YOUTUBE section shows a download panel while yt-dlp is missing; it's
+  calls it at startup. The ONLINE section shows a download panel while yt-dlp is missing; it's
   hidden only on platforms with no yt-dlp build to download.
 - `src-tauri/tauri.bundle-yt-dlp.conf.json` adds yt-dlp back as `externalBin` for installers that
   should ship it: `bun run tauri build --config src-tauri/tauri.bundle-yt-dlp.conf.json`.
@@ -354,6 +380,7 @@ Stored in localStorage:
 - `playmusic-playerbar-height` — last drag-resized player bar height
 - `playmusic-videopane-width` — last drag-resized video pane width
 - `playmusic-online-video` — whether online tracks play with video
+- `playmusic-online-platform` — the selected ONLINE tab (youtube or twitch)
 
 Cover thumbnails are cached in the OS app cache dir (cleared if the app is uninstalled).
 
@@ -361,12 +388,12 @@ Cover thumbnails are cached in the OS app cache dir (cleared if the app is unins
 
 - `src/constants.ts` — `VIDEO_EXTS`, `AUDIO_EXTS`, `isVideo()`, `isAudio()`
 - `src/utils/filterDirs.ts` — fuzzy search via Fuse.js with weighted fields
-- `src/utils/trackName.ts` — `displayName()`: file name without extension or YouTube `[id]`
+- `src/utils/trackName.ts` — `displayName()`: file name without extension or the YouTube/Twitch `[id]`
 - `src/utils/format.ts` — `formatDuration()`, `formatRelative()`
 - `src/components/TrackRow.tsx` / `TrackCover.tsx` — the one row layout and cover tile shared by
-  library tracks, YouTube results and the player bar
-- `src/api/local.ts` — `scanLibrary()`; `src/api/online.ts` — `searchYouTube()`,
-  `clearYouTubeSearch()` and the IPC wrappers
+  library tracks, online results and the player bar
+- `src/api/local.ts` — `scanLibrary()`; `src/api/online.ts` — `searchOnlineNow()`,
+  `clearOnlineSearch()`, `selectPlatform()` and the IPC wrappers
 
 ## Conventions
 
@@ -374,8 +401,8 @@ Cover thumbnails are cached in the OS app cache dir (cleared if the app is unins
   or `var(--color-app-*)` in inline styles. No hardcoded hex values or raw
   `slate-*` / `red-*` Tailwind classes.
 - New shared state goes in the Zustand store, not React Context.
-- State is grouped by source in the store: `library.*` for local files, `youtube.*` for
-  YouTube search, downloads and the video setting.
+- State is grouped by source in the store: `library.*` for local files, `online.*` for
+  YouTube/Twitch search, downloads and the video setting.
 - Components subscribe selectively via `useAppStore(s => s.specificField)` to
   minimize re-renders.
 - Heavy CPU/IO work runs in Rust commands, not in the WebView.
