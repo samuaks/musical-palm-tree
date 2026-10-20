@@ -371,7 +371,8 @@ runs without it (local-only). `ytdlp.rs` owns finding, installing, updating and 
 Two themes via CSS variables in `src/App.css` `@theme` block:
 
 - Default `:root` — dark mode (low-saturation slate gradient with a hint of violet + amber accent)
-- `[data-theme="light"]` — Mirror's Edge inspired (white + crimson red)
+- `[data-theme="light"]` — warm cream paper with warm browns for text and a deep Mirror's Edge
+  red accent; no star field. Text tokens keep ≥ 4.5:1 contrast on the whole gradient.
 
 Theme toggled via `useAppStore(s => s.setTheme)`. Setting persists to
 localStorage and applies via `document.documentElement.dataset.theme`.
