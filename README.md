@@ -37,6 +37,8 @@ terminal player, and is meant as a learning-friendly codebase (the repository is
 - Videos play in a resizable pane on the right; fullscreen with `F`, a double-click, or the
   fullscreen button. The player bar can be resized too.
 
+![Player bar: cover art, the whole track's waveform, and the hover-to-seek preview](./screenshots/player-bar.png)
+
 **Online space (optional)**
 
 - YouTube search (top 10 results) and audio-only streaming through
