@@ -45,6 +45,9 @@ pub async fn download_media(
     video_id: String,
     kind: Kind,
 ) -> Result<Downloaded, String> {
+    if video_id.starts_with("live:") {
+        return Err("recording live streams isn't supported".to_string());
+    }
     let url =
         media_url(platform, &video_id).ok_or_else(|| format!("not a video id: {video_id}"))?;
     let file_id = file_id(platform, &video_id);

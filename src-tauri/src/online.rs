@@ -19,9 +19,15 @@ pub struct OnlineSearchResult {
     pub thumbnail: Option<String>,
     pub uploader: Option<String>,
     pub view_count: Option<u64>,
-    /// When it was published or broadcast (Unix seconds), if known.
+    /// When it was published or broadcast (Unix seconds), if known. For a live stream: when it
+    /// started.
     pub timestamp: Option<i64>,
+    /// A Twitch channel that's live right now (`video_id` is `live:<channel>`).
+    pub live: bool,
 }
+
+/// Prefix of a live stream's id: `live:<channel>`. ':' can't appear in channel names or VOD ids.
+const LIVE_PREFIX: &str = "live:";
 
 // What yt-dlp emits per line with --dump-json (--flat-playlist for searches and channel lists)
 #[derive(Debug, Deserialize)]
@@ -127,6 +133,10 @@ pub fn media_url(platform: Platform, id: &str) -> Option<String> {
             valid.then(|| format!("https://www.youtube.com/watch?v={id}"))
         }
         Platform::Twitch => {
+            if let Some(name) = id.strip_prefix(LIVE_PREFIX) {
+                return is_channel_name(name)
+                    .then(|| format!("https://www.twitch.tv/{}", name.to_ascii_lowercase()));
+            }
             let digits = id.strip_prefix('v').unwrap_or(id);
             let valid =
                 (1..=20).contains(&digits.len()) && digits.chars().all(|c| c.is_ascii_digit());
@@ -146,6 +156,7 @@ pub async fn search_online(
     }
 
     let limit = SEARCH_RESULTS.to_string();
+    let mut live_check = None;
     let (args, platform, channel): (Vec<String>, Platform, Option<String>) =
         match classify(&query, platform)? {
             Target::YouTubeSearch(text) => (
@@ -156,16 +167,32 @@ pub async fn search_online(
                 Platform::Youtube,
                 None,
             ),
-            Target::TwitchChannel(name) => (
-                vec![
-                    "--flat-playlist".into(),
-                    "--playlist-end".into(),
-                    limit,
-                    format!("https://www.twitch.tv/{name}/videos?filter=archives&sort=time"),
-                ],
-                Platform::Twitch,
-                Some(name),
-            ),
+            Target::TwitchChannel(name) => {
+                // Whether the channel is live, checked while its VODs are listed (~1.8 s each).
+                // yt-dlp exits with an error when it's offline.
+                let app = app.clone();
+                let url = format!("https://www.twitch.tv/{name}");
+                live_check = Some(tauri::async_runtime::spawn(async move {
+                    let args = [
+                        "--dump-json",
+                        "--no-warnings",
+                        "--no-playlist",
+                        "-f",
+                        "ba/b",
+                    ];
+                    ytdlp::run(&app, &[&args[..], &[url.as_str()]].concat()).await
+                }));
+                (
+                    vec![
+                        "--flat-playlist".into(),
+                        "--playlist-end".into(),
+                        limit,
+                        format!("https://www.twitch.tv/{name}/videos?filter=archives&sort=time"),
+                    ],
+                    Platform::Twitch,
+                    Some(name),
+                )
+            }
             Target::Video(platform, id) => {
                 let url = media_url(platform, &id).ok_or("invalid video link")?;
                 (vec!["--no-playlist".into(), url], platform, None)
@@ -175,7 +202,108 @@ pub async fn search_online(
     let mut all = vec!["--dump-json", "--no-warnings"];
     all.extend(args.iter().map(String::as_str));
     let stdout = ytdlp::run(&app, &all).await?;
-    Ok(parse_entries(&stdout, platform, channel.as_deref()))
+    let mut results = parse_entries(&stdout, platform, channel.as_deref());
+
+    // A live stream goes on top of the channel's VODs.
+    if let (Some(check), Some(name)) = (live_check, channel.as_deref()) {
+        if let Ok(Ok(stdout)) = check.await {
+            if let Some(live) = parse_live(&stdout, name) {
+                results.insert(0, live);
+            }
+        }
+    }
+    Ok(results)
+}
+
+// What yt-dlp emits with --dump-json for a live Twitch channel (`twitch.tv/<channel>`)
+#[derive(Debug, Deserialize)]
+struct YtDlpLive {
+    title: Option<String>,
+    /// The stream's own title; yt-dlp's `title` is "<Channel> (live) <date>".
+    description: Option<String>,
+    uploader: Option<String>,
+    timestamp: Option<f64>,
+    thumbnails: Option<Vec<YtDlpThumbnail>>,
+    thumbnail: Option<String>,
+    is_live: Option<bool>,
+}
+
+/// The live stream of `channel` as a result, or `None` if the output isn't a live stream.
+fn parse_live(stdout: &str, channel: &str) -> Option<OnlineSearchResult> {
+    let line = stdout.lines().find(|line| !line.trim().is_empty())?;
+    let live: YtDlpLive = serde_json::from_str(line).ok()?;
+    if live.is_live != Some(true) {
+        return None;
+    }
+    let title = live
+        .description
+        .filter(|d| !d.trim().is_empty())
+        .or(live.title)
+        .unwrap_or_else(|| format!("{channel} is live"));
+    Some(OnlineSearchResult {
+        platform: Platform::Twitch,
+        video_id: format!("{LIVE_PREFIX}{channel}"),
+        title: title.trim().to_string(),
+        duration_secs: 0.0,
+        thumbnail: pick_thumbnail(live.thumbnails)
+            .or(live.thumbnail)
+            .map(|url| live_preview(&url)),
+        uploader: live.uploader.or_else(|| Some(channel.to_string())),
+        view_count: None,
+        timestamp: live.timestamp.map(|t| t as i64),
+        live: true,
+    })
+}
+
+/// Twitch live previews come in any size (`.../live_user_<name>-1280x720.jpg`); a row needs a
+/// small one.
+fn live_preview(url: &str) -> String {
+    match url.rfind('-') {
+        Some(i) if url.contains("/previews-ttv/") && url.ends_with(".jpg") => {
+            format!("{}-320x180.jpg", &url[..i])
+        }
+        _ => url.to_string(),
+    }
+}
+
+/// Fetches a Twitch live HLS playlist for hls.js. Twitch's playlist server refuses requests
+/// whose `Origin` isn't twitch.tv (the WebView would send `tauri.localhost`), so playlists are
+/// fetched here, without one. Segments are served with `Access-Control-Allow-Origin: *` and load
+/// directly.
+#[tauri::command]
+pub async fn fetch_live_playlist(url: String) -> Result<String, String> {
+    if !is_live_playlist_url(&url) {
+        return Err(format!("not a Twitch playlist: {url}"));
+    }
+    static CLIENT: std::sync::OnceLock<reqwest::Client> = std::sync::OnceLock::new();
+    let client = CLIENT.get_or_init(|| {
+        reqwest::Client::builder()
+            .timeout(std::time::Duration::from_secs(10))
+            .build()
+            .unwrap_or_default()
+    });
+    client
+        .get(&url)
+        .send()
+        .await
+        .and_then(|r| r.error_for_status())
+        .map_err(|e| format!("couldn't fetch the live playlist: {e}"))?
+        .text()
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Only https URLs on Twitch's video hosts (`*.ttvnw.net`): the command must not become a way to
+/// fetch arbitrary URLs.
+fn is_live_playlist_url(url: &str) -> bool {
+    let Some(rest) = url.strip_prefix("https://") else {
+        return false;
+    };
+    let host = rest.split(['/', '?', '#']).next().unwrap_or("");
+    host.ends_with(".ttvnw.net")
+        && host
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '-')
 }
 
 /// One result per JSON line. Twitch channel lists don't name the channel in each entry, so
@@ -209,6 +337,7 @@ fn parse_entries(
                     .or_else(|| channel.map(str::to_string)),
                 view_count: entry.view_count.map(|n| n as u64),
                 timestamp,
+                live: false,
             }
         })
         .collect();
@@ -244,6 +373,9 @@ pub struct ResolvedStream {
     pub audio_url: String,
     pub video_url: Option<String>,
     pub height: Option<u32>,
+    /// Served from Twitch's live playlist servers: MPEG-TS HLS behind an origin-checked playlist,
+    /// which the WebView can't play natively; the frontend uses hls.js and `fetch_live_playlist`.
+    pub live: bool,
 }
 
 // What yt-dlp emits with --dump-json for the selected format(s): a merged pick (video+audio)
@@ -345,10 +477,15 @@ fn parse_resolved(stdout: &str) -> Result<ResolvedStream, String> {
     };
 
     let (video_url, height) = video.unwrap_or((None, None));
+    let audio_url = audio.ok_or("yt-dlp returned no audio stream URL")?;
+    // Decided by where it's served, not yt-dlp's `is_live`: the VOD of a broadcast that's still
+    // going is "live" too, but it comes from the VOD CDN (fMP4) and plays natively.
+    let live = is_live_playlist_url(&audio_url);
     Ok(ResolvedStream {
-        audio_url: audio.ok_or("yt-dlp returned no audio stream URL")?,
+        audio_url,
         video_url,
         height,
+        live,
     })
 }
 
@@ -384,6 +521,7 @@ mod tests {
                 audio_url: "https://a/140".into(),
                 video_url: Some("https://v/137".into()),
                 height: Some(1080),
+                live: false,
             })
         );
     }
@@ -397,6 +535,7 @@ mod tests {
                 audio_url: "https://a/140".into(),
                 video_url: None,
                 height: None,
+                live: false,
             })
         );
     }
@@ -442,6 +581,7 @@ mod tests {
                 audio_url: "https://t/audio_only/index-dvr.m3u8".into(),
                 video_url: Some("https://t/720p60/index-dvr.m3u8".into()),
                 height: Some(720),
+                live: false,
             })
         );
     }
@@ -586,7 +726,101 @@ mod tests {
             ["bbbbbbbbbbb", "aaaaaaaaaaa"],
             "search relevance order"
         );
+        assert!(results.iter().all(|r| !r.live));
         assert_eq!(results[0].timestamp, Some(1700000000));
         assert_eq!(results[1].timestamp, None);
+    }
+
+    // Trimmed from `yt-dlp --dump-json -f ba https://www.twitch.tv/hasanabi` while live
+    const LIVE: &str = r#"{"id": "320917243488", "title": "HasanAbi (live) 2026-10-20 22:42", "description": "MIDTERM MANIA", "uploader": "HasanAbi", "uploader_id": "hasanabi", "timestamp": 1792520700, "is_live": true, "live_status": "is_live", "thumbnails": [{"url": "https://static-cdn.jtvnw.net/previews-ttv/live_user_hasanabi-1280x720.jpg", "width": 1280}, {"url": "https://static-cdn.jtvnw.net/previews-ttv/live_user_hasanabi-0x0.jpg"}], "url": "https://x.playlist.ttvnw.net/v1/playlist/abc.m3u8"}"#;
+
+    #[test]
+    fn a_live_channel_becomes_a_live_result() {
+        let live = parse_live(LIVE, "hasanabi").unwrap();
+        assert_eq!(live.video_id, "live:hasanabi");
+        assert_eq!(
+            live.title, "MIDTERM MANIA",
+            "the stream title, not yt-dlp's"
+        );
+        assert_eq!(live.uploader.as_deref(), Some("HasanAbi"));
+        assert_eq!(live.timestamp, Some(1792520700));
+        assert!(live.live);
+        assert_eq!(
+            live.thumbnail.as_deref(),
+            Some("https://static-cdn.jtvnw.net/previews-ttv/live_user_hasanabi-320x180.jpg")
+        );
+    }
+
+    #[test]
+    fn offline_or_odd_output_is_not_live() {
+        assert_eq!(parse_live("", "x"), None);
+        assert_eq!(
+            parse_live(
+                "ERROR: [twitch:stream] x: The channel is not currently live",
+                "x"
+            ),
+            None
+        );
+        assert_eq!(parse_live(r#"{"is_live": false, "title": "t"}"#, "x"), None);
+    }
+
+    #[test]
+    fn live_ids_point_at_the_channel() {
+        assert_eq!(
+            media_url(Platform::Twitch, "live:HasanAbi").as_deref(),
+            Some("https://www.twitch.tv/hasanabi")
+        );
+        assert_eq!(media_url(Platform::Twitch, "live:a b"), None);
+        assert_eq!(media_url(Platform::Twitch, "live:"), None);
+        assert_eq!(media_url(Platform::Youtube, "live:hasanabi"), None);
+    }
+
+    #[test]
+    fn resolving_a_live_stream_says_so() {
+        let json = r#"{"is_live": true, "requested_formats": [
+            {"url": "https://x.playlist.ttvnw.net/v1/playlist/v.m3u8", "vcodec": "avc1.4D401F", "height": 720},
+            {"url": "https://x.playlist.ttvnw.net/v1/playlist/a.m3u8", "vcodec": "none"}
+        ]}"#
+        .replace('\n', "");
+        let resolved = parse_resolved(&json).unwrap();
+        assert!(resolved.live);
+        assert_eq!(resolved.height, Some(720));
+        assert!(!parse_resolved(r#"{"url": "https://a"}"#).unwrap().live);
+
+        // The VOD of a broadcast still in progress: yt-dlp says is_live, but it's on the VOD CDN
+        // and plays natively
+        let recording = r#"{"is_live": true, "url": "https://d2vi6trrdongqn.cloudfront.net/x/audio_only/index-dvr.m3u8"}"#;
+        assert!(!parse_resolved(recording).unwrap().live);
+    }
+
+    #[test]
+    fn only_twitch_video_hosts_are_fetched() {
+        assert!(is_live_playlist_url(
+            "https://eun13.playlist.ttvnw.net/v1/playlist/CpQF.m3u8"
+        ));
+        assert!(is_live_playlist_url(
+            "https://usher.ttvnw.net/api/x.m3u8?a=b"
+        ));
+        for bad in [
+            "http://eun13.playlist.ttvnw.net/v1/playlist/x.m3u8",
+            "https://evil.com/.ttvnw.net/x.m3u8",
+            "https://ttvnw.net.evil.com/x",
+            "https://user@evil.com?.ttvnw.net",
+            "file:///etc/passwd",
+        ] {
+            assert!(!is_live_playlist_url(bad), "{bad}");
+        }
+    }
+
+    #[test]
+    fn live_previews_are_shrunk() {
+        assert_eq!(
+            live_preview("https://static-cdn.jtvnw.net/previews-ttv/live_user_x_y-0x0.jpg"),
+            "https://static-cdn.jtvnw.net/previews-ttv/live_user_x_y-320x180.jpg"
+        );
+        assert_eq!(
+            live_preview("https://i.ytimg.com/vi/a-b/hq.jpg"),
+            "https://i.ytimg.com/vi/a-b/hq.jpg"
+        );
     }
 }

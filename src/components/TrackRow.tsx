@@ -8,7 +8,8 @@ interface TrackRowProps {
   subtitle: ReactNode
   /** Shown after the subtitle and never cut off (e.g. `13h ago`); the subtitle shortens first. */
   subtitleEnd?: string
-  duration: string
+  /** `3:11`, or a LIVE badge */
+  duration: ReactNode
   /** Buttons on the right (e.g. downloads); clicks on them don't play the row. */
   actions?: ReactNode
   /** For ScrollToActive, which finds the playing row by it. */

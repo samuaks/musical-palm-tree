@@ -70,7 +70,7 @@ src-tauri/src/
   mirrors live in `src/types.ts`. **Change both sides together.** (`scanner.rs` has a test
   pinning `MediaFile`'s field names.)
 - Commands: `scan_media`, `generate_waveform`, `cover_art`, `search_online`,
-  `resolve_stream`, `download_media`, `yt_dlp_status`, `install_yt_dlp`. New commands must be added to `generate_handler!` in
+  `resolve_stream`, `fetch_live_playlist`, `download_media`, `yt_dlp_status`, `install_yt_dlp`. New commands must be added to `generate_handler!` in
   `lib.rs`. Window permissions live in `src-tauri/capabilities/default.json`; Rust-side
   process spawning (`tauri-plugin-shell`'s `command()`) isn't scoped by capabilities.
 - Run yt-dlp only through `ytdlp::run` (or `ytdlp::run_streaming` for line-by-line output),
@@ -139,10 +139,16 @@ src-tauri/src/
   waveform for a long track take minutes in `tauri dev`. Keep that override.
 - Online video plays as two streams: the picture muted in the `<video>`, following the
   `<audio>`, which stays the master for every control (`useVideoSync`). YouTube: a video-only
-  https stream (prefer avc1) + m4a. Twitch: HLS only, played natively by the WebView (its CDN
-  allows CORS only for twitch.tv, so hls.js can't be used); a ≤720p stream is paired with
+  https stream (prefer avc1) + m4a. Twitch VODs: HLS only, played natively by the WebView (its
+  CDN allows CORS only for twitch.tv, so hls.js can't fetch it); a ≤720p stream is paired with
   `Audio_Only` via `--audio-multistreams`. yt-dlp can't search Twitch: the twitch tab lists a
   channel's VODs.
+- Twitch **live** is the exception: MPEG-TS segments (the built-in HLS player only takes fMP4)
+  behind a playlist server that rejects non-twitch.tv Origins. It plays through hls.js
+  (`src/utils/liveHls.ts`, lazy-loaded) with playlists fetched by the Rust command
+  `fetch_live_playlist` (no Origin; https `*.ttvnw.net` only). Whether a stream needs this is
+  decided by its host (`ResolvedStream.live`), not yt-dlp's `is_live`, which is also true for
+  the still-recording VOD of a live broadcast.
 
 ## Git and PRs
 

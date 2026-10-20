@@ -26,6 +26,7 @@ export interface OnlineTrack {
 
   // online-only
   uploader?: string
+  live?: boolean // a live stream: no duration, no seeking
 }
 
 export type Track = LocalTrack | OnlineTrack
@@ -71,6 +72,7 @@ export interface OnlineSearchResult {
   uploader: string | null // for Twitch channel lists: the channel
   view_count: number | null
   timestamp: number | null // published or broadcast, Unix seconds
+  live: boolean // a Twitch channel live right now; video_id is `live:<channel>`
 }
 
 /** Mirrors `online::ResolvedStream` in src-tauri/src/online.rs. */
@@ -78,6 +80,7 @@ export interface ResolvedStream {
   audio_url: string
   video_url: string | null // video-only stream, played muted and synced to the audio
   height: number | null
+  live: boolean // play through hls.js (see src/utils/liveHls.ts)
 }
 
 /** Mirrors `ytdlp::Status` in src-tauri/src/ytdlp.rs. */

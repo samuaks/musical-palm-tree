@@ -5,6 +5,7 @@ import { isVideo } from '../constants'
 import { useAppStore, selectCurrentTrack } from '../store'
 import { resolveStream } from '../api/online'
 import { useVideoSync } from './useVideoSync'
+import { attachLive } from '../utils/liveHls'
 
 const RETRY_COOLDOWN_MS = 10_000
 
@@ -34,6 +35,29 @@ export function useAudioPlayer(
 
   const lastRetryAt = useRef<number>(0)
   const loadedTrack = useRef<typeof track>(null)
+  // hls.js instances playing a live stream (stopped on every track change), and the retry for
+  // when one of them fails
+  const liveStops = useRef<(() => void)[]>([])
+  const retryRef = useRef<(() => void) | null>(null)
+
+  function stopLive() {
+    for (const stop of liveStops.current) stop()
+    liveStops.current = []
+  }
+
+  /** Points `el` at `url`: directly, or through hls.js for a live stream. */
+  async function load(el: HTMLMediaElement, url: string, live: boolean) {
+    if (!live) {
+      el.src = url
+      el.load()
+      return
+    }
+    const stop = await attachLive(el, url, (message) => {
+      console.error('live stream failed:', message)
+      retryRef.current?.()
+    })
+    liveStops.current.push(stop)
+  }
 
   const { volume, changeVolume, toggleMute } = useVolume()
 
@@ -54,6 +78,8 @@ export function useAudioPlayer(
     setStorePlaying(playing)
   }, [playing])
 
+  useEffect(() => stopLive, [])
+
   useEffect(() => {
     const audio = audioRef.current
     const video = videoRef.current
@@ -63,11 +89,13 @@ export function useAudioPlayer(
     const resume = sameTrack ? !getMedia().paused : true
     loadedTrack.current = track
 
+    stopLive()
     audio.pause()
     video?.pause()
     setSyncedVideo(false)
 
     if (!track) {
+      stopLive()
       clearSrc(audio)
       if (video) clearSrc(video)
       setConvertedSrc('')
@@ -85,6 +113,7 @@ export function useAudioPlayer(
     ;(async () => {
       let src: string
       let videoSrc: string | null = null
+      let live = false
       if (track.source === 'local') {
         src = convertFileSrc(track.path)
       } else {
@@ -93,6 +122,7 @@ export function useAudioPlayer(
           const stream = await resolveStream(track.platform, track.videoId, onlineVideo)
           src = stream.audio_url
           videoSrc = stream.video_url
+          live = stream.live
         } catch (e) {
           console.error('failed to resolve stream:', e)
           if (!cancelled) {
@@ -114,17 +144,16 @@ export function useAudioPlayer(
         if (el && el !== media && el !== follower) clearSrc(el)
       }
       if (video) video.muted = follower !== null
-      if (follower && videoSrc) {
-        follower.src = videoSrc
-        follower.load()
-      }
+      if (follower && videoSrc) await load(follower, videoSrc, live)
+      setConvertedSrc(src)
+      await load(media, src, live)
+      // hls.js loads asynchronously; the track may have changed meanwhile
+      if (cancelled) return
       setSyncedVideo(follower !== null)
       setVideoActive(media === video || follower !== null)
 
-      setConvertedSrc(src)
-      media.src = src
-      media.load()
-      if (resumeAt > 0) media.currentTime = resumeAt
+      // A live stream always starts at the live edge.
+      if (resumeAt > 0 && !live) media.currentTime = resumeAt
       if (!resume) return
 
       const playPromise = media.play()
@@ -166,21 +195,22 @@ export function useAudioPlayer(
       try {
         const fresh = await resolveStream(platform, videoId, video !== null)
         if (cancelled) return // track changed during retry — abort
+        stopLive()
         setConvertedSrc(fresh.audio_url)
         if (video) {
           if (fresh.video_url) {
-            video.src = fresh.video_url
-            video.load()
-            video.currentTime = resumeAt
+            await load(video, fresh.video_url, fresh.live)
+            if (!fresh.live) video.currentTime = resumeAt
           } else {
             clearSrc(video)
             setSyncedVideo(false)
             setVideoActive(false)
           }
         }
-        audio.src = fresh.audio_url
-        audio.load()
-        audio.currentTime = resumeAt
+        await load(audio, fresh.audio_url, fresh.live)
+        if (cancelled) return
+        // A live stream picks up at the live edge
+        if (!fresh.live) audio.currentTime = resumeAt
         if (wasPlaying) {
           await audio.play().catch((e) => {
             if (e.name !== 'AbortError') console.error('play after retry failed:', e)
@@ -193,10 +223,13 @@ export function useAudioPlayer(
       }
     }
 
+    // hls.js (live) reports its failures through this instead of an element `error` event
+    retryRef.current = handleError
     audio.addEventListener('error', handleError)
     video?.addEventListener('error', handleError)
     return () => {
       cancelled = true
+      retryRef.current = null
       audio.removeEventListener('error', handleError)
       video?.removeEventListener('error', handleError)
     }
@@ -294,7 +327,8 @@ export function useAudioPlayer(
   }
 
   function seek(time: number) {
-    if (!track) return
+    // A live stream has nothing to seek to (this also covers the ←/→ keys).
+    if (!track || (track.source === 'online' && track.live)) return
     const media = getMedia()
     media.currentTime = time
     setCurrentTime(time)
