@@ -28,30 +28,30 @@
   --color-app-waveform: #475569;
 }
 [data-theme='light'] {
-  /* surfaces — almost pure white */
-  --color-app-bg: rgba(255, 255, 255, 0.85);
-  --color-app-surface: rgba(255, 255, 255, 0.95);
+  /* surfaces — warm cream paper rather than white, easier on the eyes */
+  --color-app-bg: rgba(250, 246, 239, 0.85);
+  --color-app-surface: rgba(252, 249, 243, 0.95);
 
-  /* hover/selected — gentle red wash */
-  --color-app-hover: rgba(0, 0, 0, 0.1);
-  --color-app-selected: rgba(220, 38, 38, 0.15); /* was 0.08 */
+  /* hover/selected — warm wash, red tint for the selection */
+  --color-app-hover: rgba(60, 40, 20, 0.07);
+  --color-app-selected: rgba(196, 42, 34, 0.13);
 
-  /* text — clean and dark for readability */
-  --color-app-text: #0a0a0a;
-  --color-app-secondary: #404040;
-  --color-app-muted: #737373;
+  /* text — warm near-black and browns that sit on cream */
+  --color-app-text: #1f1b16;
+  --color-app-secondary: #5c554b;
+  --color-app-muted: #6d655b; /* ≥ 4.5:1 on the whole cream gradient */
 
   --color-app-accent-text: #ffffff;
-  /* the iconic red accent */
-  --color-app-accent: #dc2626; /* red-600 — Mirror's Edge red */
-  --color-app-accent-played: #b91c1c; /* red-700 */
-  --color-app-accent-rewind: #991b1b; /* red-800 */
-  --color-app-accent-dim: rgba(220, 38, 38, 0.3);
+  /* the Mirror's Edge red, a little deeper so it holds up on cream */
+  --color-app-accent: #c42a22;
+  --color-app-accent-played: #a8231c;
+  --color-app-accent-rewind: #8a1d17;
+  --color-app-accent-dim: rgba(196, 42, 34, 0.3);
 
-  /* clean borders */
-  --color-app-border: rgba(0, 0, 0, 0.08);
-  --color-app-skeleton: rgba(0, 0, 0, 0.05);
-  --color-app-waveform: #d4d4d4;
+  /* warm borders */
+  --color-app-border: rgba(60, 40, 20, 0.1);
+  --color-app-skeleton: rgba(60, 40, 20, 0.07);
+  --color-app-waveform: #d6cdbd;
 }
 
 html,
@@ -111,7 +111,13 @@ body::before {
 }
 
 [data-theme='light'] body {
-  background: linear-gradient(180deg, #ffffff 0%, #fafbfc 50%, #f5f7fa 100%);
+  /* cream paper, a little deeper toward the player bar */
+  background: linear-gradient(180deg, #f6f1e8 0%, #f1ebe0 50%, #ebe4d6 100%);
+}
+
+/* the star field belongs to the dark theme */
+[data-theme='light'] body::before {
+  display: none;
 }
 /* 
   Subtle warm: background: linear-gradient(180deg, #1a1a1a 0%, #2a1f24 100%);
