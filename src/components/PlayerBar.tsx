@@ -11,12 +11,12 @@ import {
   Loader2,
   Music,
   Video,
+  VideoOff,
 } from 'lucide-react'
 import { useAudioPlayer } from '../hooks/useAudioPlayer'
 import { useWaveform } from '../hooks/useWaveform'
 import { useResizable } from '../hooks/useResizable'
 import { Waveform } from './Waveform'
-import { isVideo } from '../constants'
 import { usePlayer } from '../hooks/usePlayer'
 import { selectCurrentTrack, useAppStore } from '../store'
 import { useFullscreen } from '../hooks/useFullscreen'
@@ -48,7 +48,9 @@ export function PlayerBar() {
   const { waveformData, generateWaveform } = useWaveform()
 
   const displayName = track?.name.replace(/\.[^/.]+$/, '') ?? 'No track selected'
-  const trackIsVideo = track ? isVideo(track.ext) : false
+  const trackIsVideo = useAppStore((s) => s.videoActive)
+  const onlineVideo = useAppStore((s) => s.spaces.online.video)
+  const setOnlineVideo = useAppStore((s) => s.setOnlineVideo)
   const cover = useCoverArt(track)
 
   useEffect(() => {
@@ -133,6 +135,18 @@ export function PlayerBar() {
               className="w-24 accent-app-accent"
             />
           </div>
+
+          {track?.source === 'online' && (
+            <button
+              onClick={() => setOnlineVideo(!onlineVideo)}
+              className={`transition-colors ${
+                onlineVideo ? 'text-app-accent' : 'text-app-muted hover:text-app-text'
+              }`}
+              title={onlineVideo ? 'Audio only' : 'Play video'}
+            >
+              {onlineVideo ? <Video size={14} /> : <VideoOff size={14} />}
+            </button>
+          )}
 
           {track && trackIsVideo && (
             <button

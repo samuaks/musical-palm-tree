@@ -39,8 +39,9 @@ terminal player, and is meant as a learning-friendly codebase (the repository is
 
 **Online space (optional)**
 
-- YouTube search (top 10 results) and audio-only streaming through
-  [yt-dlp](https://github.com/yt-dlp/yt-dlp). Not needed for local files; see
+- YouTube search (top 10 results) and streaming through
+  [yt-dlp](https://github.com/yt-dlp/yt-dlp): video up to 1080p in the video pane, or audio only
+  with the video button in the player bar. Not needed for local files; see
   [Online space](#online-space-optional) below.
 
 **App**
@@ -74,7 +75,6 @@ These work while nothing else has keyboard focus (click an empty area after usin
   use different web engines (WebView2, WKWebView), so this is specific to Linux.
 - The scanned folders are fixed, and the library is only scanned at startup.
 - Duplicates are only counted; there's no view of which files they are.
-- Online streams are audio-only.
 
 ## Supported formats
 

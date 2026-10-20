@@ -1,6 +1,6 @@
 // src/api/online.ts
 import { invoke } from '@tauri-apps/api/core'
-import { OnlineSearchResult, OnlineTrack, YtDlpStatus } from '../types'
+import { OnlineSearchResult, OnlineTrack, ResolvedStream, YtDlpStatus } from '../types'
 
 /** Whether yt-dlp is installed, and whether the app can install it. */
 export async function ytDlpStatus(): Promise<YtDlpStatus> {
@@ -18,8 +18,9 @@ export async function searchOnline(query: string): Promise<OnlineSearchResult[]>
   return invoke<OnlineSearchResult[]>('search_online', { query: trimmed })
 }
 
-export async function resolveStream(videoId: string): Promise<string> {
-  return invoke<string>('resolve_stream', { videoId })
+/** Stream URLs for a video: audio, plus a video-only stream when `video` is on and available. */
+export async function resolveStream(videoId: string, video: boolean): Promise<ResolvedStream> {
+  return invoke<ResolvedStream>('resolve_stream', { videoId, video })
 }
 
 /**
@@ -33,7 +34,7 @@ export function resultToTrack(result: OnlineSearchResult): OnlineTrack {
     videoId: result.video_id,
     path: result.video_id, // used as stable id by existing UI
     name: result.title,
-    ext: 'webm', // bestaudio default; not used for routing
+    ext: 'm4a', // not a video ext: video is decided when the stream is resolved
     duration_secs: result.duration_secs,
     size_bytes: 0,
     art_path: result.thumbnail, // already an https URL

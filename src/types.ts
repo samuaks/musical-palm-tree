@@ -17,7 +17,7 @@ export interface OnlineTrack {
   // mirror MediaFile field names so existing consumers Just Work
   path: string // = videoId, used as stable identifier (NOT a filesystem path)
   name: string // video title
-  ext: string // 'webm' | 'm4a' | 'mp4' — whatever yt-dlp's bestaudio returns
+  ext: string // 'm4a'; whether video plays is decided when the stream is resolved
   duration_secs: number // from search metadata
   size_bytes: number // 0 (unknown for streams)
   art_path: string | null // YouTube thumbnail URL (https://...)
@@ -63,6 +63,13 @@ export interface OnlineSearchResult {
   duration_secs: number
   thumbnail: string | null
   uploader: string | null
+}
+
+/** Mirrors `online::ResolvedStream` in src-tauri/src/online.rs. */
+export interface ResolvedStream {
+  audio_url: string
+  video_url: string | null // video-only stream, played muted and synced to the audio
+  height: number | null
 }
 
 /** Mirrors `ytdlp::Status` in src-tauri/src/ytdlp.rs. */

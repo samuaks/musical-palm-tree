@@ -1,10 +1,9 @@
-import { isVideo } from '../constants'
 import { useResizable } from '../hooks/useResizable'
-import { selectCurrentTrack, useAppStore } from '../store'
+import { useAppStore } from '../store'
 
 export function VideoPane() {
-  const currentTrack = useAppStore(selectCurrentTrack)
-  const visible = !!(currentTrack && isVideo(currentTrack.ext))
+  // a local video file, or an online track playing with picture
+  const visible = useAppStore((s) => s.videoActive)
 
   const { size: width, startDrag } = useResizable({
     defaultSize: 480,

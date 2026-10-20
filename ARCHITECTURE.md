@@ -121,6 +121,8 @@ Single store at `src/store.ts`. Three categories of state:
   the current track (local or online) is derived via `selectCurrentTrack`
 - `playing` — playback state (true/false)
 - `resolving` — an online stream URL is being resolved
+- `videoActive` — the current track shows a picture (a local video, or an online track with a
+  video stream); drives the video pane and fullscreen
 - `theme` — `'dark' | 'light'`
 
 ### Per-space (namespaced under `spaces.{id}`)
@@ -133,6 +135,7 @@ Single store at `src/store.ts`. Three categories of state:
 - `spaces.local.durations` — `Record<path, seconds>` filled lazily
 - `spaces.local.collapsed` — `Set<string>` of collapsed album keys
 - `spaces.online.query` / `results` / `searchState` / `searchError` — online search
+- `spaces.online.video` — play online tracks with video (persisted, default on)
 
 ### Selective subscriptions
 
@@ -177,7 +180,7 @@ ytdlp.rs ← yt_dlp_status / install_yt_dlp, finds/updates/runs yt-dlp
 | `generate_waveform` | Whole-track loudness overview (cached)     | async      |
 | `cover_art`         | Cover thumbnail for one track, as data URL | async      |
 | `search_online`     | yt-dlp `ytsearch10:` flat search           | async      |
-| `resolve_stream`    | yt-dlp lookup of a playable stream URL     | async      |
+| `resolve_stream`    | yt-dlp lookup of audio (+ video) URLs      | async      |
 | `yt_dlp_status`     | Whether yt-dlp is found / installable      | sync       |
 | `install_yt_dlp`    | Download + verify yt-dlp into app data dir | async      |
 
@@ -231,6 +234,25 @@ tracks use their YouTube thumbnail URL) and keeps up to 200 results in memory.
   its width and draws as many 2 px bars (2 px gaps) as fit, resampling the points by taking each
   group's peak; the playhead is a single bar.
 
+### Online Playback (`online.rs`, `useAudioPlayer`, `useVideoSync`)
+
+YouTube only offers picture and sound in one stream at 360p (format 18); everything sharper is
+a video-only stream. So `resolve_stream(video_id, video)` asks yt-dlp (`--dump-json -f ...`) for
+two https URLs: a video-only stream up to 1080p (avc1 preferred, since every WebView decodes it;
+no HLS, which WebView2 can't play) and an m4a audio stream. With video off, or when there's no
+usable video stream, it returns audio only.
+
+- The sound plays in the `<audio>` element, which stays the master: play, pause, seek, volume,
+  `timeupdate` and `ended` all go through it, as for any audio track.
+- The picture plays muted in the `<video>` (portaled into the video pane). `useVideoSync`
+  mirrors play/pause/seek/rate onto it and pauses it while the audio buffers. Small drift
+  (> 40 ms) is closed by running the video 10% faster or slower for a moment; more than 0.3 s
+  snaps it to the audio's time. The audio is never paused for the video.
+- The player bar's video button toggles `spaces.online.video`; the current track is re-resolved
+  and resumes where it was.
+- Stream URLs expire after a few hours. An `error` on either element re-resolves both and resumes
+  (at most every 10 s).
+
 ### Optional yt-dlp (`ytdlp.rs`)
 
 yt-dlp is an optional runtime dependency, not a required Tauri sidecar, so the app builds and
@@ -272,6 +294,7 @@ runs without it (local-only). `ytdlp.rs` owns finding, installing, updating and 
 | `useScan`        | Mounts scan listeners, invokes `scan_media`, writes to store |
 | `useDurations`   | Lazily fills track durations via `<audio>` metadata          |
 | `useAudioPlayer` | Audio/video playback, seek, keyboard shortcuts, stream resolve |
+| `useVideoSync`   | Keeps an online track's muted video in step with its audio   |
 | `useVolume`      | Volume state with localStorage persistence + mute toggle     |
 | `useWaveform`    | Invokes Rust `generate_waveform`, manages loading state      |
 | `useResizable`   | Generic horizontal/vertical drag-to-resize with persistence  |
@@ -310,6 +333,7 @@ Stored in localStorage:
 - `playmusic-collapsed` — Set of collapsed album keys
 - `playmusic-playerbar-height` — last drag-resized player bar height
 - `playmusic-videopane-width` — last drag-resized video pane width
+- `playmusic-online-video` — whether online tracks play with video
 
 Cover thumbnails are cached in the OS app cache dir (cleared if the app is uninstalled).
 
