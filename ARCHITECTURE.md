@@ -148,10 +148,9 @@ App.tsx
 │ │ ├── ScrollToActive
 │ │ ├── Library ← LIBRARY (filtered by the query)
 │ │ │ └── TrackList
-│ │ │ └── Track (×N)
-│ │ │ └── PlayingIndicator (when active)
+│ │ │ └── Track (×N) → TrackRow + TrackCover (lazy cover)
 │ │ └── YouTubeSection ← YOUTUBE (while the query isn't empty)
-│ │ └── ResultRow (×N) + DownloadButtons
+│ │ └── ResultRow (×N) → TrackRow + TrackCover + DownloadButtons
 │ └── VideoPane ← portal target for video element
 └── PlayerBar
 ├── Waveform
@@ -173,7 +172,7 @@ ytdlp.rs ← yt_dlp_status / install_yt_dlp, finds/updates/runs yt-dlp
 | `scan_media`        | Recursive scan, emits progress events      | async      |
 | `generate_waveform` | Whole-track loudness overview (cached)     | async      |
 | `cover_art`         | Cover thumbnail for one track, as data URL | async      |
-| `search_online`     | yt-dlp `ytsearch10:` flat search           | async      |
+| `search_online`     | yt-dlp `ytsearch20:` flat search           | async      |
 | `resolve_stream`    | yt-dlp lookup of audio (+ video) URLs      | async      |
 | `download_media`    | Download audio/video into the library      | async      |
 | `yt_dlp_status`     | yt-dlp found / installable, ffmpeg found   | sync       |
@@ -194,9 +193,16 @@ most every 250 ms.
 
 ### Cover Art (`art.rs`)
 
-Shown in the player bar for the current track, so it's produced on demand rather than during
-the scan. `useCoverArt` calls `cover_art(path)` when a local track becomes current (online
-tracks use their YouTube thumbnail URL) and keeps up to 200 results in memory.
+Shown in the player bar for the current track and in every list row, so it's produced on demand
+rather than during the scan. Both go through `loadCover(path)` in `src/hooks/useCoverArt.ts`,
+which calls `cover_art(path)`, shares lookups already in flight, and keeps up to 400 results in
+memory. Online tracks use their YouTube thumbnail URL.
+
+- **List rows** (`useRowCover`): one shared `IntersectionObserver`, rooted at MainView's scrolling
+  list (`#main-scroll`) with a 400 px margin, looks a row's cover up only once it's near view. A
+  big library doesn't ask Rust for every file's art at startup.
+- **No art**: `TrackCover` shows a placeholder tile with a music or video icon; video files with
+  real art get a small video badge so the media type stays visible.
 
 - **Embedded picture** via `lofty` (front cover preferred, else the first picture). Works for
   ID3 (mp3), FLAC PICTURE blocks, Ogg `METADATA_BLOCK_PICTURE` and MP4 `covr` (m4a).
@@ -355,6 +361,10 @@ Cover thumbnails are cached in the OS app cache dir (cleared if the app is unins
 
 - `src/constants.ts` — `VIDEO_EXTS`, `AUDIO_EXTS`, `isVideo()`, `isAudio()`
 - `src/utils/filterDirs.ts` — fuzzy search via Fuse.js with weighted fields
+- `src/utils/trackName.ts` — `displayName()`: file name without extension or YouTube `[id]`
+- `src/utils/format.ts` — `formatDuration()`, `formatRelative()`
+- `src/components/TrackRow.tsx` / `TrackCover.tsx` — the one row layout and cover tile shared by
+  library tracks, YouTube results and the player bar
 - `src/api/local.ts` — `scanLibrary()`; `src/api/online.ts` — `searchYouTube()`,
   `clearYouTubeSearch()` and the IPC wrappers
 

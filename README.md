@@ -28,9 +28,11 @@ terminal player, and is meant as a learning-friendly codebase (the repository is
 
 - Plays audio and video. Next/previous follow the list the track was picked from (library order,
   or the YouTube results), and the next track starts when one ends.
-- Cover art for the current track: the picture embedded in the file (mp3, flac, ogg, m4a), or else a
-  `cover`, `folder`, `front` or `album` image (jpg/png) in the track's folder. YouTube thumbnails for
-  online tracks.
+- Cover art in the list and the player bar: the picture embedded in the file (mp3, flac, ogg, m4a),
+  or else a `cover`, `folder`, `front` or `album` image (jpg/png) in the track's folder. YouTube
+  thumbnails for online tracks. Tracks without art show a music or video placeholder, and library
+  tracks and YouTube results are listed the same way (downloaded files without the `[id]` that
+  their file names carry).
 - Waveform of the whole track in the player bar: click to seek, hover to preview the position. It's
   decoded in Rust in the background and cached, so replaying a track shows it instantly. Until it's
   ready, and for tracks that have none (online streams, unsupported codecs), a plain progress line
@@ -40,7 +42,7 @@ terminal player, and is meant as a learning-friendly codebase (the repository is
 
 **YouTube (optional)**
 
-- Press Enter in the search box to also search YouTube (top 10 results); they're listed under
+- Press Enter in the search box to also search YouTube (top 20 results); they're listed under
   your library's matches. Streaming goes through [yt-dlp](https://github.com/yt-dlp/yt-dlp):
   video up to 1080p in the video pane, or audio only with the video button in the player bar.
   Not needed for local files; see [YouTube search](#youtube-search-optional) below.
@@ -171,7 +173,6 @@ screenshots for UI changes, and say how you verified it.
 | Item                                           | Status      |
 | ---------------------------------------------- | ----------- |
 | Custom scan folders via a settings UI          | Planned     |
-| Show cover art in the library too              | Planned     |
 | Autocomplete dropdown with keyboard navigation | Planned     |
 | Playlists                                      | Planned     |
 | Shuffle / loop modes                           | Planned     |

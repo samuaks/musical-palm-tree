@@ -27,6 +27,10 @@ struct YtDlpThumbnail {
     width: Option<u32>,
 }
 
+/// Results per YouTube search. YouTube returns about 20 per request, so 20 costs the same as 10
+/// (~1.7 s, most of it yt-dlp starting up); each further batch adds ~0.5 s.
+const SEARCH_RESULTS: usize = 20;
+
 #[tauri::command]
 pub async fn search_online(
     app: tauri::AppHandle,
@@ -36,7 +40,7 @@ pub async fn search_online(
         return Ok(Vec::new());
     }
 
-    let search_arg = format!("ytsearch10:{}", query);
+    let search_arg = format!("ytsearch{SEARCH_RESULTS}:{query}");
 
     let stdout = ytdlp::run(
         &app,

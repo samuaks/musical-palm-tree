@@ -5,6 +5,7 @@ import { YouTubeSection } from './YouTubeSection'
 import { ScrollToActive } from './ScrollToActivate'
 import { useScan } from '../hooks/useScan'
 import { useDurations } from '../hooks/useDurations'
+import { SCROLL_ROOT_ID } from '../hooks/useCoverArt'
 import { useAppStore } from '../store'
 import { downloadKey } from '../api/online'
 import { DownloadProgress } from '../types'
@@ -21,7 +22,7 @@ export function MainView() {
   return (
     <div className="flex-1 relative overflow-hidden">
       <ScrollToActive />
-      <div className="overflow-y-auto h-full py-2">
+      <div id={SCROLL_ROOT_ID} className="overflow-y-auto h-full py-2">
         <Library />
         <YouTubeSection />
       </div>

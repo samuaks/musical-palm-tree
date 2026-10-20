@@ -126,7 +126,8 @@ src-tauri/src/
   no album; otherwise the first subfolder is the album.
 - Duplicates come from a partial MD5 of size + first 4 KiB + last 4 KiB. A match is a
   strong hint, not proof; hash the whole file before ever deleting anything.
-- Cover art is extracted on demand for the playing track (not during the scan) and cached
+- Cover art is extracted on demand (not during the scan): for the playing track, and for list
+  rows as they scroll near view (`useRowCover`, never all at once). It's cached
   as 256 px thumbnails: `app_cache_dir/cover_<partial hash>.jpg`, or an empty
   `cover_<hash>.none` when there's no embedded art. Folder images (`cover.jpg` etc.) are the
   fallback and are never cached as "none". Changing the hash format invalidates the cache.
