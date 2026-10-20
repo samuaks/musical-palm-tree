@@ -4,19 +4,25 @@ import { TrackList } from './TrackList'
 import { useAppStore } from '../store'
 import { useMemo } from 'react'
 import { filterDirs } from '../utils/filterDirs'
+import { SourceHeader } from './SourceHeader'
 
 export function Library() {
-  const dirs = useAppStore((s) => s.spaces.local.dirs)
-  const query = useAppStore((s) => s.spaces.local.query)
-  const scanState = useAppStore((s) => s.spaces.local.scanState)
-  const collapsed = useAppStore((s) => s.spaces.local.collapsed)
-  const toggleCollapsed = useAppStore((s) => s.toggleLocalCollapsed)
+  const dirs = useAppStore((s) => s.library.dirs)
+  const query = useAppStore((s) => s.query)
+  const scanState = useAppStore((s) => s.library.scanState)
+  const collapsed = useAppStore((s) => s.library.collapsed)
+  const toggleCollapsed = useAppStore((s) => s.toggleLibraryCollapsed)
 
   const filtered = useMemo(() => filterDirs(dirs, query), [dirs, query])
+  const searching = query.trim() !== ''
+  const matches = filtered.reduce(
+    (sum, dir) => sum + dir.files.length + dir.albums.reduce((n, a) => n + a.files.length, 0),
+    0
+  )
 
   if (scanState === 'scanning' && dirs.length === 0) {
     return (
-      <div className="flex-1 overflow-y-auto py-2">
+      <div>
         {Array.from({ length: 3 }).map((_, i) => (
           <AlbumSkeleton key={i} />
         ))}
@@ -25,14 +31,16 @@ export function Library() {
   }
 
   return (
-    <div className="overflow-y-auto h-full py-2">
+    <div>
+      {searching && <SourceHeader name="library" count={matches} />}
+
       {scanState === 'scanning' && (
-        <div className="px-4 py-1 text-xs text-slate-600 font-mono animate-pulse">scanning...</div>
+        <div className="px-4 py-1 text-xs text-app-muted font-mono animate-pulse">scanning...</div>
       )}
 
       {filtered.length === 0 && scanState === 'done' && (
-        <div className="px-4 py-3 text-xs text-slate-600 font-mono">
-          {query ? 'no results.' : 'no media found.'}
+        <div className="px-6 py-3 text-xs text-app-muted font-mono">
+          {searching ? 'no matches in your library.' : 'no media found.'}
         </div>
       )}
 

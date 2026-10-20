@@ -27,19 +27,19 @@ export function scanLibrary(): Promise<void> {
     scanAgain = true
     return scanning
   }
-  const { setLocalDirs, setLocalScanMeta, setLocalScanState } = useAppStore.getState()
+  const { setLibraryDirs, setLibraryScanMeta, setLibraryScanState } = useAppStore.getState()
   scanning = (async () => {
     do {
       scanAgain = false
-      setLocalScanState('scanning')
+      setLibraryScanState('scanning')
       try {
         const r = await invoke<ScanResult>('scan_media')
-        setLocalDirs(r.directories)
-        setLocalScanMeta(r.metadata)
+        setLibraryDirs(r.directories)
+        setLibraryScanMeta(r.metadata)
       } catch (e) {
         console.error('scan failed:', e)
       }
-      setLocalScanState('done')
+      setLibraryScanState('done')
     } while (scanAgain)
   })().finally(() => {
     scanning = null

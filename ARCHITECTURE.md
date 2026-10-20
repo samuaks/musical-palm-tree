@@ -22,18 +22,18 @@ ideas, while using different stacks and interaction models.
 ## Overview
 
 PlayMusic Desktop is a Tauri 2 desktop app with a React frontend and Rust backend.
-The app is structured around the concept of "spaces" — distinct music sources
-(local filesystem, online streaming, etc.) that share common playback
-infrastructure.
+It has one main view: your local library, and a single search box that filters it as you
+type and searches YouTube (through the optional yt-dlp) when you press Enter. Local tracks
+and YouTube results share the same playback infrastructure.
 
 ## How To Read This Project
 
 If you are new to this codebase, start with:
 
 1. `src/App.tsx` - top-level layout and persistent player shell
-2. `src/spaces/index.tsx` - registered content spaces
-3. `src/spaces/LocalSpace.tsx` - local media library flow
-4. `src/spaces/OnlineSpace.tsx` - online search results flow
+2. `src/components/Header.tsx` - library stats and the search box
+3. `src/components/MainView.tsx` - the library and YouTube sections
+4. `src/components/YouTubeSection.tsx` - YouTube results, playing and downloading
 5. `src/components/PlayerBar.tsx` - playback controls, waveform, and media elements
 6. `src/store.ts` - global Zustand state and queue model
 7. `src-tauri/src/lib.rs` - registered Rust commands
@@ -45,13 +45,15 @@ Rust, and Rust handles heavier filesystem and media work.
 
 ## Main User Flow
 
-1. The app opens with a desktop shell: titlebar, header, sidebar, active space,
-   video pane, and player bar.
-2. The active space renders either local media or online search.
-3. Local media is scanned through the Rust `scan_media` command.
-4. Scan progress streams back to React via Tauri events.
-5. Selecting a track updates the global queue in Zustand.
-6. `PlayerBar` owns playback controls, waveform display, and audio/video
+1. The app opens with a desktop shell: titlebar, header, main view, video pane, and
+   player bar.
+2. The library is scanned at startup through the Rust `scan_media` command; scan progress
+   streams back to React via Tauri events.
+3. Typing in the search box filters the library (Fuse.js). Pressing Enter also searches
+   YouTube; results appear in a YOUTUBE section under the library matches.
+4. Selecting a track (local or YouTube) updates the global queue in Zustand: the queue is the
+   list it was picked from.
+5. `PlayerBar` owns playback controls, waveform display, and audio/video
    elements.
 
 ## Tech Stack
@@ -67,100 +69,91 @@ Rust, and Rust handles heavier filesystem and media work.
 ┌─────────────────────────────────────────────────┐
 │ Titlebar (custom — minimize/maximize/close) │
 ├─────────────────────────────────────────────────┤
-│ Header (active space header + theme toggle) │
-├──────┬──────────────────────────────────────────┤
-│ │ │
-│Space │ Active Space Component │
-│Side │ (Local | Online | …) │
-│bar │ │
-│ ├─────────────┬────────────────────────────┤
-│ │ │ Video Pane (right side, │
-│ │ Library │ when video track playing) │
-│ │ │ │
-├──────┴─────────────┴────────────────────────────┤
-│ Player Bar (overlays bottom of content) │
+│ Header (stats, search box, theme toggle) │
+├────────────────────────────┬────────────────────┤
+│ MainView │ Video Pane │
+│ LIBRARY (filtered) │ (right side, when │
+│ YOUTUBE (while searching) │ a video plays) │
+├────────────────────────────┴────────────────────┤
+│ Player Bar │
 └─────────────────────────────────────────────────┘
 
-## Spaces
+## Main View and Search
 
-A "space" is a self-contained content view registered in `src/spaces/index.tsx`.
-Each space defines:
+There's one search box (`query` in the store), in `Header`:
 
-- `id` — unique identifier
-- `name` — display name
-- `icon` — JSX element for the sidebar
-- `Component` — the React component rendered when the space is active
-- `Header` — the component rendered in the top header (stats, search) when active
+- **Empty**: `MainView` shows the whole library (directories → albums → tracks).
+- **Typing**: `Library` filters with `filterDirs` (Fuse.js) and gets a `LIBRARY n` header.
+  Below it, `YouTubeSection` offers `search youtube for "…" ⏎`. YouTube isn't searched while
+  typing, so local lookups never call yt-dlp.
+- **Enter** (or clicking that row): `searchYouTube(query)` in `src/api/online.ts` runs
+  `search_online` and stores the results with the query they belong to (`searchedQuery`). If
+  the query changes afterwards, the old results stay under a `results for "…"` label until
+  the next search. A newer search always wins over a slower older one.
+- **Clearing** the box drops the YouTube results (`clearYouTubeSearch`).
 
-Switching spaces does NOT pause playback. The player bar, video pane, audio
-volume, and current track persist across space switches because they live at
-the root level, not inside any space.
+Playback doesn't care where a track came from: the player bar, video pane, volume and current
+track live at the root, and the queue is whatever list the track was picked from (library
+order, or the YouTube results).
 
-### Active Spaces
-
-| Space  | Source                   | Status         |
-| ------ | ------------------------ | -------------- |
-| Local  | Filesystem scan via Rust | ✅ Implemented |
-| Online | YouTube search/streaming via optional yt-dlp | ✅ Implemented |
-
-### Adding a New Space
-
-1. Create `src/spaces/MySpace.tsx` and `src/spaces/MySpaceHeader.tsx`
-2. Add `{ id, name, icon, Component, Header }` to the `SPACES` array in `src/spaces/index.tsx`
-3. Add per-space state to `spaces` object in `src/store.ts` if needed
-4. Sidebar icon appears automatically
+Until yt-dlp is installed, the YOUTUBE section shows the install panel instead of results; it's
+hidden entirely on platforms where the app can't install yt-dlp.
 
 ## State Architecture (Zustand)
 
-Single store at `src/store.ts`. Three categories of state:
+Single store at `src/store.ts`, with state grouped by source:
 
-### Root-level (shared across spaces)
+### Root-level
 
-- `activeSpaceId` — currently selected space (persisted)
+- `query` — the search box: filters the library, searched on YouTube on Enter
 - `queue` / `queueIndex` — the play queue, the single source of truth for playback;
   the current track (local or online) is derived via `selectCurrentTrack`
 - `playing` — playback state (true/false)
 - `resolving` — an online stream URL is being resolved
 - `videoActive` — the current track shows a picture (a local video, or an online track with a
   video stream); drives the video pane and fullscreen
+- `ytDlp` — `{ available, can_install, ffmpeg }`, checked at startup
 - `theme` — `'dark' | 'light'`
 
-### Per-space (namespaced under `spaces.{id}`)
+### Library (`library.*`)
 
-- `spaces.local.dirs` — scanned directory tree
-- `spaces.local.scanMeta` — scan timing/counts
-- `spaces.local.scanState` — `'idle' | 'scanning' | 'done'`
-- `spaces.local.liveCount` — live file count during scan
-- `spaces.local.query` — search input
-- `spaces.local.durations` — `Record<path, seconds>` filled lazily
-- `spaces.local.collapsed` — `Set<string>` of collapsed album keys
-- `spaces.online.query` / `results` / `searchState` / `searchError` — online search
-- `spaces.online.video` — play online tracks with video (persisted, default on)
-- `spaces.online.downloads` — download status per `videoId:kind` (state, percent, path/error)
+- `library.dirs` — scanned directory tree
+- `library.scanMeta` — scan timing/counts
+- `library.scanState` — `'idle' | 'scanning' | 'done'`
+- `library.liveCount` — live file count during scan
+- `library.durations` — `Record<path, seconds>` filled lazily
+- `library.collapsed` — `Set<string>` of collapsed album keys
+
+### YouTube (`youtube.*`)
+
+- `youtube.results` / `searchedQuery` / `searchState` / `searchError` — the last search
+- `youtube.video` — play online tracks with video (persisted, default on)
+- `youtube.downloads` — download status per `videoId:kind` (state, percent, path/error)
 
 ### Selective subscriptions
 
 Components only re-render when the slice they subscribe to changes:
 
 ```tsx
-const dirs = useAppStore((s) => s.spaces.local.dirs)
+const dirs = useAppStore((s) => s.library.dirs)
 ```
 
 ## Component Hierarchy
 
 App.tsx
 ├── Titlebar
-├── Header ← active space's Header + ThemeToggle
+├── Header ← stats, search box (Enter searches YouTube), ThemeToggle
 ├── (main row)
-│ ├── SpaceSidebar
-│ ├── <ActiveSpace /> ← LocalSpace, OnlineSpace, etc.
-│ │ └── (Local) Library
-│ │ └── TrackList
-│ │ └── Track (×N)
-│ │ └── PlayingIndicator (when active)
-│ ├── ScrollToActive ← lives inside LocalSpace
+│ ├── MainView ← runs the scan, durations and download-progress listeners
+│ │ ├── ScrollToActive
+│ │ ├── Library ← LIBRARY (filtered by the query)
+│ │ │ └── TrackList
+│ │ │ └── Track (×N)
+│ │ │ └── PlayingIndicator (when active)
+│ │ └── YouTubeSection ← YOUTUBE (while the query isn't empty)
+│ │ └── ResultRow (×N) + DownloadButtons
 │ └── VideoPane ← portal target for video element
-└── PlayerBar (absolute bottom, overlay)
+└── PlayerBar
 ├── Waveform
 └── createPortal(<video>) → VideoPane
 
@@ -250,7 +243,7 @@ usable video stream, it returns audio only.
   mirrors play/pause/seek/rate onto it and pauses it while the audio buffers. Small drift
   (> 40 ms) is closed by running the video 10% faster or slower for a moment; more than 0.3 s
   snaps it to the audio's time. The audio is never paused for the video.
-- The player bar's video button toggles `spaces.online.video`; the current track is re-resolved
+- The player bar's video button toggles `youtube.video`; the current track is re-resolved
   and resumes where it was.
 - Stream URLs expire after a few hours. An `error` on either element re-resolves both and resumes
   (at most every 10 s).
@@ -259,7 +252,7 @@ usable video stream, it returns audio only.
 
 `download_media(video_id, kind)` saves a search result into a scanned folder, so it becomes a
 local track: audio as m4a in `~/Music/YouTube`, video as mp4 in `~/Videos/YouTube` (album
-"YouTube" in the Local space). Files are named `<title> [<id>].<ext>`; an existing file with that
+"YouTube" in the library). Files are named `<title> [<id>].<ext>`; an existing file with that
 id is returned without downloading again.
 
 - **ffmpeg is optional** (`ytdlp::locate_ffmpeg`: `PATH`, then Homebrew/pipx dirs). With it:
@@ -271,8 +264,8 @@ id is returned without downloading again.
   reports its video and audio parts in turn.
 - The finished file is found by its `[<id>]` name rather than from yt-dlp's printed path, which
   Windows consoles can mangle for non-ASCII titles.
-- **Frontend**: `DownloadButton`s on each Online result row track their status in
-  `spaces.online.downloads`. When a download lands, `scanLibrary()` (`api/local.ts`) rescans;
+- **Frontend**: `DownloadButton`s on each YouTube result row track their status in
+  `youtube.downloads` (progress is listened to in `MainView`). When a download lands, `scanLibrary()` (`api/local.ts`) rescans;
   a call during a scan queues one more. Live `scan_progress` snapshots only fill an empty
   library, so a rescan doesn't flicker the list.
 
@@ -304,9 +297,8 @@ runs without it (local-only). `ytdlp.rs` owns finding, installing, updating and 
 - An `RwLock` keeps updates from replacing the binary while it runs, which Windows doesn't
   allow.
 - **Frontend**: `yt_dlp_status` returns `{ available, can_install, ffmpeg }`. `useOnlineAvailability`
-  calls it at startup. The Online space shows a download panel while yt-dlp is missing; it's
-  hidden only on platforms with no yt-dlp build to download. If Online was the last-used space
-  and yt-dlp is missing, the app starts on Local.
+  calls it at startup. The YOUTUBE section shows a download panel while yt-dlp is missing; it's
+  hidden only on platforms with no yt-dlp build to download.
 - `src-tauri/tauri.bundle-yt-dlp.conf.json` adds yt-dlp back as `externalBin` for installers that
   should ship it: `bun run tauri build --config src-tauri/tauri.bundle-yt-dlp.conf.json`.
 
@@ -351,7 +343,6 @@ translucent panel surfaces (`bg-app-bg/80`).
 Stored in localStorage:
 
 - `playmusic-theme` — current theme
-- `playmusic-active-space` — last selected space
 - `playmusic-volume` — last volume setting
 - `playmusic-collapsed` — Set of collapsed album keys
 - `playmusic-playerbar-height` — last drag-resized player bar height
@@ -364,6 +355,8 @@ Cover thumbnails are cached in the OS app cache dir (cleared if the app is unins
 
 - `src/constants.ts` — `VIDEO_EXTS`, `AUDIO_EXTS`, `isVideo()`, `isAudio()`
 - `src/utils/filterDirs.ts` — fuzzy search via Fuse.js with weighted fields
+- `src/api/local.ts` — `scanLibrary()`; `src/api/online.ts` — `searchYouTube()`,
+  `clearYouTubeSearch()` and the IPC wrappers
 
 ## Conventions
 
@@ -371,7 +364,8 @@ Cover thumbnails are cached in the OS app cache dir (cleared if the app is unins
   or `var(--color-app-*)` in inline styles. No hardcoded hex values or raw
   `slate-*` / `red-*` Tailwind classes.
 - New shared state goes in the Zustand store, not React Context.
-- Local-space-specific state lives under `spaces.local.*` in the store.
+- State is grouped by source in the store: `library.*` for local files, `youtube.*` for
+  YouTube search, downloads and the video setting.
 - Components subscribe selectively via `useAppStore(s => s.specificField)` to
   minimize re-renders.
 - Heavy CPU/IO work runs in Rust commands, not in the WebView.

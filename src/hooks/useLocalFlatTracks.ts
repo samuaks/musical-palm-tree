@@ -11,7 +11,7 @@ import { LocalTrack } from '../types'
  * the order prev/next should follow when playing from local.
  */
 export function useLocalFlatTracks(): LocalTrack[] {
-  const dirs = useAppStore((s) => s.spaces.local.dirs)
+  const dirs = useAppStore((s) => s.library.dirs)
   return useMemo(() => {
     return dirs.flatMap((dir) => [
       ...dir.files.map(localTrack),

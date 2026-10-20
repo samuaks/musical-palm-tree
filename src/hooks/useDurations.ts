@@ -22,15 +22,15 @@ export function useDurations() {
   const queue = useRef<string[]>([])
   const inFlight = useRef(0)
 
-  const dirs = useAppStore((s) => s.spaces.local.dirs)
-  const setDuration = useAppStore((s) => s.setLocalDuration)
+  const dirs = useAppStore((s) => s.library.dirs)
+  const setDuration = useAppStore((s) => s.setLibraryDuration)
 
   useEffect(() => {
     const allFiles = dirs.flatMap((d) => [
       ...d.files.map((f) => f.path),
       ...d.albums.flatMap((a) => a.files.map((f) => f.path)),
     ])
-    const existing = useAppStore.getState().spaces.local.durations
+    const existing = useAppStore.getState().library.durations
     queue.current = allFiles.filter((path) => !(path in existing))
     pump()
   }, [dirs])
