@@ -139,7 +139,7 @@ Single store at `src/store.ts`, with state grouped by source:
 
 - `online.platform` — the ONLINE tab, `'youtube' | 'twitch'` (persisted)
 - `online.results` / `searchedQuery` / `searchState` / `searchError` — the last search
-- `online.video` — play online tracks with video (persisted, default on)
+- `online.video` — play the current online track with video (back on for every new track)
 - `online.downloads` — download status per `platform:videoId:kind` (state, percent, path/error)
 
 ### Selective subscriptions
@@ -287,7 +287,8 @@ stream, it returns sound only.
   (> 40 ms) is closed by running the video 10% faster or slower for a moment; more than 0.3 s
   snaps it to the audio's time. The audio is never paused for the video.
 - The player bar's video button toggles `online.video`; the current track is re-resolved
-  and resumes where it was.
+  and resumes where it was. Audio-only lasts for that track: picking or skipping to another
+  one turns video back on (YouTube and Twitch always have it), and it isn't saved.
 - Stream URLs expire after a few hours. An `error` on either element re-resolves both and resumes
   (at most every 10 s).
 
@@ -397,7 +398,6 @@ Stored in localStorage:
 - `playmusic-collapsed` — Set of collapsed album keys
 - `playmusic-playerbar-height` — last drag-resized player bar height
 - `playmusic-videopane-width` — last drag-resized video pane width
-- `playmusic-online-video` — whether online tracks play with video
 - `playmusic-online-platform` — the selected ONLINE tab (youtube or twitch)
 
 Cover thumbnails are cached in the OS app cache dir (cleared if the app is uninstalled).

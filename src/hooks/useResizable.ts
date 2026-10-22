@@ -25,6 +25,7 @@ export function useResizable({
     }
   })
   const dragging = useRef(false)
+  const viewport = useViewportSize(axis)
 
   useEffect(() => {
     if (!storageKey) return
@@ -58,5 +59,22 @@ export function useResizable({
     document.body.style.userSelect = 'none'
   }
 
-  return { size, setSize, startDrag }
+  // The saved size can be from a bigger window (e.g. maximized): fit it to the current one, so
+  // the rest of the layout keeps its `maxFromViewport`. The saved preference itself is kept.
+  const fitted = Math.max(min, Math.min(viewport - maxFromViewport, size))
+
+  return { size: fitted, setSize, startDrag }
+}
+
+function useViewportSize(axis: 'vertical' | 'horizontal') {
+  const read = () => (axis === 'vertical' ? window.innerHeight : window.innerWidth)
+  const [viewport, setViewport] = useState(read)
+
+  useEffect(() => {
+    const update = () => setViewport(read())
+    window.addEventListener('resize', update)
+    return () => window.removeEventListener('resize', update)
+  }, [axis])
+
+  return viewport
 }
