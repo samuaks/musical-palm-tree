@@ -93,11 +93,10 @@ export function PlayerBar() {
           <div className="flex flex-col min-w-0 flex-1">
             <span className="text-sm font-mono text-app-accent truncate">{displayName}</span>
             <span className="text-xs font-mono text-app-muted tabular-nums">
-              {live ? (
-                <span className="text-app-accent">● LIVE</span>
-              ) : (
-                `${formatTime(currentTime)} / ${formatTime(duration)}`
-              )}
+              {live
+                ? // the LIVE badge is in the seek bar's place below
+                  (track.uploader ?? 'Live broadcast')
+                : `${formatTime(currentTime)} / ${formatTime(duration)}`}
             </span>
           </div>
 
@@ -168,13 +167,16 @@ export function PlayerBar() {
         </div>
 
         <div className="flex-1 px-6 pb-2 min-h-0" style={{ height: '72px' }}>
-          <Waveform
-            data={waveformData}
-            // A live stream has no timeline: the line stays full
-            currentTime={live ? 1 : currentTime}
-            duration={live ? 1 : duration}
-            onSeek={seek}
-          />
+          {live ? (
+            <LiveIndicator />
+          ) : (
+            <Waveform
+              data={waveformData}
+              currentTime={currentTime}
+              duration={duration}
+              onSeek={seek}
+            />
+          )}
         </div>
 
         <div className="flex items-center gap-4 px-6 py-1.5 border-t border-app-border text-[10px] font-mono text-app-muted">
@@ -184,11 +186,31 @@ export function PlayerBar() {
           <span>
             <span className="text-app-secondary">↑↓</span> volume
           </span>
-          <span>
-            <span className="text-app-secondary">←→</span> seek
-          </span>
+          {!live && (
+            <span>
+              <span className="text-app-secondary">←→</span> seek
+            </span>
+          )}
         </div>
       </div>
     </>
+  )
+}
+
+/** Takes the seek bar's place for a live stream, which has no timeline to seek in. */
+function LiveIndicator() {
+  return (
+    <div className="h-full flex items-center gap-3" aria-label="live broadcast">
+      <div className="flex-1 h-px bg-app-border" />
+      <span className="flex items-center gap-2 text-xs font-mono">
+        <span className="relative flex w-2 h-2">
+          <span className="absolute inset-0 rounded-full bg-app-accent opacity-75 motion-safe:animate-ping" />
+          <span className="relative w-2 h-2 rounded-full bg-app-accent" />
+        </span>
+        <span className="font-bold tracking-wider text-app-accent">LIVE</span>
+        <span className="text-app-muted">broadcast</span>
+      </span>
+      <div className="flex-1 h-px bg-app-border" />
+    </div>
   )
 }

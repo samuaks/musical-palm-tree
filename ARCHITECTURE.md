@@ -275,7 +275,8 @@ stream, it returns sound only.
 - **Live in the UI**: the channel list checks `twitch.tv/<channel>` while it lists the VODs
   (both ~1.8 s, run in parallel) and puts the stream on top (its real title is yt-dlp's
   `description`). Rows show **LIVE** instead of a duration and have no download buttons; the
-  player bar shows `● LIVE` and a full line; seeking does nothing. Toggling video or recovering
+  player bar shows the channel name and, in the seek bar's place, a pulsing **LIVE** badge
+  (`LiveIndicator`); the `←→ seek` hint is hidden and seeking does nothing. Toggling video or recovering
   from an error restarts at the live edge. hls.js fatal errors use the same re-resolve-and-retry
   path as expired URLs.
 
