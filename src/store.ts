@@ -14,10 +14,11 @@ import {
 type Theme = 'dark' | 'light'
 
 const COLLAPSED_KEY = 'playmusic-collapsed'
-const ONLINE_VIDEO_KEY = 'playmusic-online-video'
 const ONLINE_PLATFORM_KEY = 'playmusic-online-platform'
 /** From when the app had separate Local/Online spaces; cleared at startup. */
 const LEGACY_ACTIVE_SPACE_KEY = 'playmusic-active-space'
+/** From when audio-only was a saved setting instead of per track; cleared at startup. */
+const LEGACY_ONLINE_VIDEO_KEY = 'playmusic-online-video'
 
 interface LibraryState {
   // scan state
@@ -38,7 +39,7 @@ interface OnlineState {
   searchedQuery: string | null // the query `results` belong to
   searchState: OnlineSearchState
   searchError: string | null
-  video: boolean // play online tracks with picture (persisted)
+  video: boolean // play the current online track with picture (back on for every new track)
   downloads: Record<string, DownloadStatus> // keyed by downloadKey(platform, videoId, kind)
 }
 
@@ -127,7 +128,7 @@ export const useAppStore = create<AppState>((set) => {
       searchedQuery: null,
       searchState: 'idle',
       searchError: null,
-      video: loadOnlineVideo(),
+      video: true,
       downloads: {},
     },
 
@@ -143,19 +144,20 @@ export const useAppStore = create<AppState>((set) => {
     },
     playTrackFromList: (tracks, index) => {
       if (tracks.length === 0 || index < 0 || index >= tracks.length) return
-      set({ queue: tracks, queueIndex: index })
+      set((s) => ({ queue: tracks, queueIndex: index, online: { ...s.online, video: true } }))
     },
 
+    // Audio-only applies to one track: YouTube and Twitch have video, so the next one shows it.
     playNext: () =>
       set((s) => {
         if (s.queueIndex < 0 || s.queueIndex >= s.queue.length - 1) return s
-        return { queueIndex: s.queueIndex + 1 }
+        return { queueIndex: s.queueIndex + 1, online: { ...s.online, video: true } }
       }),
 
     playPrev: () =>
       set((s) => {
         if (s.queueIndex <= 0) return s
-        return { queueIndex: s.queueIndex - 1 }
+        return { queueIndex: s.queueIndex - 1, online: { ...s.online, video: true } }
       }),
 
     clearQueue: () => set({ queue: [], queueIndex: -1 }),
@@ -185,10 +187,7 @@ export const useAppStore = create<AppState>((set) => {
         searchState: 'idle',
         searchError: null,
       })),
-    setOnlineVideo: (video) => {
-      localStorage.setItem(ONLINE_VIDEO_KEY, String(video))
-      setOnline(() => ({ video }))
-    },
+    setOnlineVideo: (video) => setOnline(() => ({ video })),
     // Results belong to one platform, so switching tabs drops them.
     setOnlinePlatform: (platform) => {
       localStorage.setItem(ONLINE_PLATFORM_KEY, platform)
@@ -227,6 +226,7 @@ if (typeof window !== 'undefined') {
   const initial = (localStorage.getItem('playmusic-theme') as Theme) || 'dark'
   document.documentElement.dataset.theme = initial
   localStorage.removeItem(LEGACY_ACTIVE_SPACE_KEY)
+  localStorage.removeItem(LEGACY_ONLINE_VIDEO_KEY)
 }
 
 export const selectCurrentTrack = (s: ReturnType<typeof useAppStore.getState>): Track | null => {
@@ -237,9 +237,4 @@ export const selectCurrentTrack = (s: ReturnType<typeof useAppStore.getState>): 
 function loadOnlinePlatform(): Platform {
   if (typeof window === 'undefined') return 'youtube'
   return localStorage.getItem(ONLINE_PLATFORM_KEY) === 'twitch' ? 'twitch' : 'youtube'
-}
-
-function loadOnlineVideo(): boolean {
-  if (typeof window === 'undefined') return true
-  return localStorage.getItem(ONLINE_VIDEO_KEY) !== 'false'
 }

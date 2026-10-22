@@ -60,7 +60,7 @@ terminal player, and is meant as a learning-friendly codebase (the repository is
 **App**
 
 - Light and dark themes, custom title bar.
-- Theme, volume, video setting, collapsed albums, and pane sizes persist between sessions.
+- Theme, volume, collapsed albums, and pane sizes persist between sessions.
 
 | Light theme                                                          | Online space before yt-dlp is installed                                     |
 | -------------------------------------------------------------------- | --------------------------------------------------------------------------- |
