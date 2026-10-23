@@ -49,7 +49,7 @@ terminal player, and is meant as a learning-friendly codebase (the repository is
     searched). If the channel is live right now, its stream is listed on top with a **LIVE**
     badge and plays live (no seeking, no recording).
   - Pasting a YouTube or Twitch link opens that video (or channel) on either tab.
-- What you watch online (for 30 seconds or more) is listed in a **HISTORY** section at the top,
+- What you watch online (for 30 seconds, or half of a shorter video) is listed in a **HISTORY** section at the top,
   most recent first (the last 50). A live channel you watched plays live again from there, or
   shows **offline**. Fold it from its header, clear it there, or remove single rows with ×.
 - Streaming goes through [yt-dlp](https://github.com/yt-dlp/yt-dlp): video up to 1080p (Twitch:

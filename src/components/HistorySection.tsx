@@ -24,6 +24,13 @@ export function HistorySection() {
   const shown = useMemo(() => filterHistory(history, query), [history, query])
   if (shown.length === 0) return null
 
+  // A live channel plays on its own; next/previous from a video walk the other videos, so
+  // playback never runs into a channel that's live (endless) or offline (stops) by itself.
+  function handlePlay(entry: HistoryEntry) {
+    const list = entry.live ? [entry] : shown.filter((e) => !e.live)
+    playTrackFromList(list.map(historyToTrack), list.indexOf(entry))
+  }
+
   return (
     <div className="mb-2">
       <div
@@ -47,11 +54,11 @@ export function HistorySection() {
 
       {!collapsed && (
         <div className="flex flex-col">
-          {shown.map((entry, i) => (
+          {shown.map((entry) => (
             <HistoryRow
               key={streamKey(entry.platform, entry.video_id)}
               entry={entry}
-              onPlay={() => playTrackFromList(shown.map(historyToTrack), i)}
+              onPlay={() => handlePlay(entry)}
             />
           ))}
         </div>
@@ -73,7 +80,7 @@ function ClearHistory() {
         setConfirming(!confirming)
       }}
       onMouseLeave={() => setConfirming(false)}
-      className={`text-xs font-mono shrink-0 transition-colors ${
+      className={`text-xs font-mono shrink-0 transition-[color,opacity] ${
         confirming
           ? 'text-app-accent'
           : 'text-app-muted hover:text-app-text opacity-0 group-hover/header:opacity-100 focus-visible:opacity-100'
@@ -115,7 +122,7 @@ function HistoryRow({ entry, onPlay }: { entry: HistoryEntry; onPlay: () => void
     <button
       onClick={() => removeFromHistory(entry.platform, entry.video_id)}
       title="remove from history"
-      className="h-8 min-w-8 px-1.5 flex items-center justify-center rounded text-app-muted hover:text-app-text opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-colors"
+      className="h-8 min-w-8 px-1.5 flex items-center justify-center rounded text-app-muted hover:text-app-text opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-[color,opacity]"
     >
       <X size={14} />
     </button>

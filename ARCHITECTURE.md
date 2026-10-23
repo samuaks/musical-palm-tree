@@ -99,7 +99,7 @@ Above the library, `HistorySection` lists what was watched online (`online.histo
 track counts once it has played for 30 s, or half of a shorter video (`useWatchHistory`, mounted
 in `MainView`; time paused or resolving doesn't count). Watching it again moves it to the top;
 the oldest drop off past 50. It's filtered by the query like the library (`filterHistory`), folds
-like an album, and its rows play like online results (the queue is the history). A live stream
+like an album, and its rows play like online results (a video queues the other videos; a live channel plays alone). A live stream
 is kept as its channel (`live:<channel>`): playing it again watches the channel live now, and if
 that fails (`online.failedStreams`, set in `useAudioPlayer`) the row says **offline**. The header
 has a **clear** control (click twice), and each row an × to remove it.
