@@ -52,7 +52,10 @@ Rust, and Rust handles heavier filesystem and media work.
 3. Typing in the search box filters the library (Fuse.js). Pressing Enter also searches the
    selected online platform; results appear in an ONLINE section under the library matches.
 4. Selecting a track (local or online) updates the global queue in Zustand: the queue is the
-   list it was picked from.
+   list it was picked from. Stop (`clearQueue()`, the square button or `S`) empties it: with no
+   current track `useAudioPlayer` lets go of both elements and any hls.js stream, and the
+   player bar is hidden (it's hidden at startup too) until a track is picked. The bar stays
+   mounted while hidden, so the hook and the `<video>` portal keep running.
 5. `PlayerBar` owns playback controls, waveform display, and audio/video
    elements.
 

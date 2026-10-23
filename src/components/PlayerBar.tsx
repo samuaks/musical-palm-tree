@@ -5,6 +5,7 @@ import {
   Pause,
   SkipBack,
   SkipForward,
+  Square,
   Volume2,
   VolumeX,
   Maximize,
@@ -45,7 +46,7 @@ export function PlayerBar() {
 
   const videoRef = useRef<HTMLVideoElement>(null)
   const { toggle: toggleFullscreen } = useFullscreen(videoRef)
-  const { playing, duration, currentTime, toggle, seek, volume, changeVolume, toggleMute } =
+  const { playing, duration, currentTime, toggle, stop, seek, volume, changeVolume, toggleMute } =
     useAudioPlayer(videoRef, next)
 
   const { waveformData, generateWaveform } = useWaveform()
@@ -74,7 +75,10 @@ export function PlayerBar() {
         document.getElementById('video-pane') ?? document.body
       )}
 
+      {/* Hidden while nothing is loaded (at startup and after stop); picking a track brings it
+          back. It's hidden rather than unmounted: useAudioPlayer above keeps the media elements. */}
       <div
+        hidden={!track}
         className="flex flex-col bg-app-bar border-t border-app-border shadow-[0_-4px_12px_var(--color-app-bar-shadow)] relative"
         style={{ height: `${height}px` }}
       >
@@ -121,6 +125,15 @@ export function PlayerBar() {
               className="text-app-secondary hover:text-app-text transition-colors"
             >
               <SkipForward size={16} />
+            </button>
+
+            <button
+              onClick={stop}
+              className="text-app-secondary hover:text-app-text transition-colors"
+              title="Stop"
+              aria-label="Stop"
+            >
+              <Square size={14} />
             </button>
           </div>
 
@@ -191,6 +204,9 @@ export function PlayerBar() {
               <span className="text-app-secondary">←→</span> seek
             </span>
           )}
+          <span>
+            <span className="text-app-secondary">s</span> stop
+          </span>
         </div>
       </div>
     </>
