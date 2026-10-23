@@ -24,6 +24,7 @@ export function useAudioPlayer(
   const setResolving = useAppStore((s) => s.setResolving)
   const setStreamFailed = useAppStore((s) => s.setStreamFailed)
   const setVideoActive = useAppStore((s) => s.setVideoActive)
+  const clearQueue = useAppStore((s) => s.clearQueue)
   const onlineVideo = useAppStore((s) => s.online.video)
 
   const audioRef = useRef<HTMLAudioElement>(new Audio())
@@ -46,8 +47,12 @@ export function useAudioPlayer(
     liveStops.current = []
   }
 
-  /** Points `el` at `url`: directly, or through hls.js for a live stream. */
-  async function load(el: HTMLMediaElement, url: string, live: boolean) {
+  /**
+   * Points `el` at `url`: directly, or through hls.js for a live stream. hls.js loads
+   * asynchronously: if the track changed or was stopped meanwhile (`cancelled`), it's let go at
+   * once instead of streaming on in the background.
+   */
+  async function load(el: HTMLMediaElement, url: string, live: boolean, cancelled: () => boolean) {
     if (!live) {
       el.src = url
       el.load()
@@ -57,7 +62,8 @@ export function useAudioPlayer(
       console.error('live stream failed:', message)
       retryRef.current?.()
     })
-    liveStops.current.push(stop)
+    if (cancelled()) stop()
+    else liveStops.current.push(stop)
   }
 
   const { volume, changeVolume, toggleMute } = useVolume()
@@ -96,7 +102,10 @@ export function useAudioPlayer(
     setSyncedVideo(false)
 
     if (!track) {
-      stopLive()
+      // stopped, or nothing played yet: let go of everything
+      if (video && document.fullscreenElement === video) {
+        document.exitFullscreen().catch(() => {})
+      }
       clearSrc(audio)
       if (video) clearSrc(video)
       setConvertedSrc('')
@@ -148,9 +157,10 @@ export function useAudioPlayer(
         if (el && el !== media && el !== follower) clearSrc(el)
       }
       if (video) video.muted = follower !== null
-      if (follower && videoSrc) await load(follower, videoSrc, live)
+      if (follower && videoSrc) await load(follower, videoSrc, live, () => cancelled)
+      if (cancelled) return
       setConvertedSrc(src)
-      await load(media, src, live)
+      await load(media, src, live, () => cancelled)
       // hls.js loads asynchronously; the track may have changed meanwhile
       if (cancelled) return
       setSyncedVideo(follower !== null)
@@ -203,7 +213,8 @@ export function useAudioPlayer(
         setConvertedSrc(fresh.audio_url)
         if (video) {
           if (fresh.video_url) {
-            await load(video, fresh.video_url, fresh.live)
+            await load(video, fresh.video_url, fresh.live, () => cancelled)
+            if (cancelled) return
             if (!fresh.live) video.currentTime = resumeAt
           } else {
             clearSrc(video)
@@ -211,7 +222,7 @@ export function useAudioPlayer(
             setVideoActive(false)
           }
         }
-        await load(audio, fresh.audio_url, fresh.live)
+        await load(audio, fresh.audio_url, fresh.live, () => cancelled)
         if (cancelled) return
         // A live stream picks up at the live edge
         if (!fresh.live) audio.currentTime = resumeAt
@@ -306,6 +317,7 @@ export function useAudioPlayer(
       if (e.code === 'ArrowLeft') seek(Math.max(0, currentTime - 5))
       if (e.code === 'ArrowUp') changeVolume(Math.min(1, volume + 0.1))
       if (e.code === 'ArrowDown') changeVolume(Math.max(0, volume - 0.1))
+      if (e.code === 'KeyS') stop()
       if (e.code === 'KeyF' && useAppStore.getState().videoActive && videoRef.current) {
         if (document.fullscreenElement) document.exitFullscreen()
         else videoRef.current.requestFullscreen()
@@ -332,6 +344,11 @@ export function useAudioPlayer(
     setPlaying(!playing)
   }
 
+  /** Ends playback. With no current track the player bar hides until a track is picked. */
+  function stop() {
+    clearQueue()
+  }
+
   function seek(time: number) {
     // A live stream has nothing to seek to (this also covers the ←/→ keys).
     if (!track || (track.source === 'online' && track.live)) return
@@ -345,6 +362,7 @@ export function useAudioPlayer(
     duration,
     currentTime,
     toggle,
+    stop,
     seek,
     volume,
     changeVolume,
