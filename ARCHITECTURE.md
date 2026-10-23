@@ -97,10 +97,10 @@ There's one search box (`query` in the store), in `Header`:
 
 Above the library, `HistorySection` lists what was watched online (`online.history`): an online
 track counts once it has played for 30 s, or half of a shorter video (`useWatchHistory`, mounted
-in `MainView`; time paused or resolving doesn't count). Watching it again moves it to the top;
-the oldest drop off past 50. It's filtered by the query like the library (`filterHistory`), folds
-like an album, and its rows play like online results (a video queues the other videos; a live channel plays alone). A live stream
-is kept as its channel (`live:<channel>`): playing it again watches the channel live now, and if
+in `MainView`; time paused, resolving, or after the stream failed doesn't count). Watching it
+again moves it to the top; the oldest drop off past 50. It's filtered by the query like the
+library (`filterHistory`), folds like an album, and its rows play like online results (a video
+queues the other videos; a live channel plays alone). A live stream is kept as its channel (`live:<channel>`): playing it again watches the channel live now, and if
 that fails (`online.failedStreams`, set in `useAudioPlayer`) the row says **offline**. The header
 has a **clear** control (click twice), and each row an × to remove it.
 
