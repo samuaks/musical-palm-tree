@@ -217,9 +217,9 @@ function ResultRow({ result, onPlay }: { result: OnlineSearchResult; onPlay: () 
  * Saves a result into the library (audio → ~/Music/<YouTube|Twitch>, video →
  * ~/Videos/<YouTube|Twitch>) and rescans so it shows up under LIBRARY. Hidden until the row is
  * hovered, unless it's downloading, done or failed. Progress comes from `download_progress`
- * (listened to in MainView).
+ * (listened to in MainView). Also used by HISTORY rows.
  */
-function DownloadButton({
+export function DownloadButton({
   platform,
   videoId,
   kind,

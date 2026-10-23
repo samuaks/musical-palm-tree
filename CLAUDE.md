@@ -49,7 +49,7 @@ download and update itself (see `src-tauri/src/ytdlp.rs`). Only installers built
 ```
 src/
   App.tsx            root shell: Header, MainView + VideoPane, PlayerBar
-  components/        Header (search), MainView (Library + OnlineSection), PlayerBar, ...
+  components/        Header (search), MainView (HistorySection + Library + OnlineSection), PlayerBar, ...
   hooks/             useScan, useAudioPlayer, useWaveform, useDurations, useResizable, ...
   store.ts           single Zustand store
   types.ts           TS mirrors of the Rust IPC structs
@@ -93,7 +93,7 @@ src-tauri/src/
   are defined in the `@theme` block of `src/App.css`.
 - Shared state goes in the Zustand store, not React Context. It's grouped by source:
   `library.*` (local files) and `online.*` (platform tab, search results, downloads, video
-  setting), with the search box's `query` and playback state at the root.
+  setting, watch history), with the search box's `query` and playback state at the root.
 - Subscribe selectively: `useAppStore((s) => s.library.dirs)`, not the whole store.
 - There's one main view: the search box filters the library as you type and searches online
   (YouTube, or a Twitch channel's VODs) only on Enter. Keep yt-dlp out of the per-keystroke path.

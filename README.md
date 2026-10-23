@@ -27,7 +27,7 @@ terminal player, and is meant as a learning-friendly codebase (the repository is
 **Player**
 
 - Plays audio and video. Next/previous follow the list the track was picked from (library order,
-  or the online results), and the next track starts when one ends.
+  the online results or the history), and the next track starts when one ends.
 - Cover art in the list and the player bar: the picture embedded in the file (mp3, flac, ogg, m4a),
   or else a `cover`, `folder`, `front` or `album` image (jpg/png) in the track's folder. YouTube and
   Twitch thumbnails for online tracks. Tracks without art show a music or video placeholder, and
@@ -49,6 +49,10 @@ terminal player, and is meant as a learning-friendly codebase (the repository is
     searched). If the channel is live right now, its stream is listed on top with a **LIVE**
     badge and plays live (no seeking, no recording).
   - Pasting a YouTube or Twitch link opens that video (or channel) on either tab.
+- What you watch online (for 30 seconds, or half of a shorter video) is listed in a **HISTORY**
+  section at the top, most recent first (the last 50). A live channel you watched plays live again
+  from there, or shows **offline**. Fold it from its header, clear it there, or remove single rows
+  with ×.
 - Streaming goes through [yt-dlp](https://github.com/yt-dlp/yt-dlp): video up to 1080p (Twitch:
   720p) in the video pane, or audio only with the video button in the player bar. Not needed for
   local files; see [Online search](#online-search-optional) below.

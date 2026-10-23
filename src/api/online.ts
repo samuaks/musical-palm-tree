@@ -3,6 +3,7 @@ import { invoke } from '@tauri-apps/api/core'
 import {
   DownloadKind,
   Downloaded,
+  HistoryEntry,
   OnlineSearchResult,
   OnlineTrack,
   Platform,
@@ -120,5 +121,24 @@ export function resultToTrack(result: OnlineSearchResult): OnlineTrack {
     created_at: result.timestamp ? result.timestamp * 1000 : Date.now(),
     uploader: result.uploader ?? undefined,
     live: result.live,
+  }
+}
+
+/** A history row played again, like a search result (it has no views or publish date). */
+export function historyToTrack(entry: HistoryEntry): OnlineTrack {
+  return resultToTrack({ ...entry, view_count: null, timestamp: null })
+}
+
+/** What `online.history` keeps of a watched track. */
+export function trackToHistory(track: OnlineTrack): HistoryEntry {
+  return {
+    platform: track.platform,
+    video_id: track.videoId,
+    title: track.name,
+    uploader: track.uploader ?? null,
+    thumbnail: track.art_path,
+    duration_secs: track.duration_secs,
+    live: track.live ?? false,
+    watched_at: Date.now(),
   }
 }

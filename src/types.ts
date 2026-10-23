@@ -83,6 +83,21 @@ export interface ResolvedStream {
   live: boolean // play through hls.js (see src/utils/liveHls.ts)
 }
 
+/**
+ * An online item that was watched (`online.history`, persisted). Frontend-only: just what's
+ * needed to list it and play it again.
+ */
+export interface HistoryEntry {
+  platform: Platform
+  video_id: string // `live:<channel>` for a live stream: playing it again watches the channel now
+  title: string // for a live stream, the stream's title when it was watched
+  uploader: string | null
+  thumbnail: string | null
+  duration_secs: number
+  live: boolean
+  watched_at: number // Unix ms
+}
+
 /** Mirrors `ytdlp::Status` in src-tauri/src/ytdlp.rs. */
 export interface YtDlpStatus {
   available: boolean
