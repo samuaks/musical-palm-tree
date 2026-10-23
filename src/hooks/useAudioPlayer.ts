@@ -103,7 +103,9 @@ export function useAudioPlayer(
 
     if (!track) {
       // stopped, or nothing played yet: let go of everything
-      if (video && document.fullscreenElement === video) document.exitFullscreen()
+      if (video && document.fullscreenElement === video) {
+        document.exitFullscreen().catch(() => {})
+      }
       clearSrc(audio)
       if (video) clearSrc(video)
       setConvertedSrc('')
