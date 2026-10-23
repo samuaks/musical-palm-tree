@@ -72,6 +72,7 @@ Rust, and Rust handles heavier filesystem and media work.
 │ Header (stats, search box, theme toggle) │
 ├────────────────────────────┬────────────────────┤
 │ MainView │ Video Pane │
+│ HISTORY (filtered) │ │
 │ LIBRARY (filtered) │ (right side, when │
 │ ONLINE youtube|twitch │ a video plays) │
 ├────────────────────────────┴────────────────────┤
@@ -93,6 +94,15 @@ There's one search box (`query` in the store), in `Header`:
   `results for "…"` label until the next search. A newer search always wins over a slower
   older one, and switching tabs (`selectPlatform`) drops the results.
 - **Clearing** the box drops the online results (`clearOnlineSearch`).
+
+Above the library, `HistorySection` lists what was watched online (`online.history`): an online
+track counts once it has played for 30 s, or half of a shorter video (`useWatchHistory`, mounted
+in `MainView`; time paused or resolving doesn't count). Watching it again moves it to the top;
+the oldest drop off past 50. It's filtered by the query like the library (`filterHistory`), folds
+like an album, and its rows play like online results (the queue is the history). A live stream
+is kept as its channel (`live:<channel>`): playing it again watches the channel live now, and if
+that fails (`online.failedStreams`, set in `useAudioPlayer`) the row says **offline**. The header
+has a **clear** control (click twice), and each row an × to remove it.
 
 What a query means is decided in Rust (`classify` in `online.rs`):
 - a pasted YouTube link (`watch`, `shorts`, `youtu.be`, music.youtube) or Twitch VOD link
@@ -141,6 +151,10 @@ Single store at `src/store.ts`, with state grouped by source:
 - `online.results` / `searchedQuery` / `searchState` / `searchError` — the last search
 - `online.video` — play the current online track with video (back on for every new track)
 - `online.downloads` — download status per `platform:videoId:kind` (state, percent, path/error)
+- `online.history` — watched online items (`HistoryEntry[]`), most recent first, deduplicated,
+  at most 50 (persisted); `online.historyCollapsed` folds the HISTORY section (persisted)
+- `online.failedStreams` — `platform:videoId` keys whose stream couldn't be resolved the last
+  time (a live channel that's offline now), so its HISTORY row can say so
 
 ### Selective subscriptions
 
@@ -158,6 +172,8 @@ App.tsx
 ├── (main row)
 │ ├── MainView ← runs the scan, durations and download-progress listeners
 │ │ ├── ScrollToActive
+│ │ ├── HistorySection ← HISTORY: watched online items (filtered by the query, foldable)
+│ │ │ └── HistoryRow (×N) → TrackRow + TrackCover + DownloadButtons + remove
 │ │ ├── Library ← LIBRARY (filtered by the query)
 │ │ │ └── TrackList
 │ │ │ └── Track (×N) → TrackRow + TrackCover (lazy cover)
@@ -359,6 +375,7 @@ runs without it (local-only). `ytdlp.rs` owns finding, installing, updating and 
 | `useScan`        | Mounts scan listeners, runs the first `scanLibrary()`        |
 | `useDurations`   | Lazily fills track durations via `<audio>` metadata          |
 | `useAudioPlayer` | Audio/video playback, seek, keyboard shortcuts, stream resolve |
+| `useWatchHistory` | Adds an online track to `online.history` after 30 s of playback |
 | `useVideoSync`   | Keeps an online track's muted video in step with its audio   |
 | `useVolume`      | Volume state with localStorage persistence + mute toggle     |
 | `useWaveform`    | Invokes Rust `generate_waveform`, manages loading state      |
@@ -399,13 +416,15 @@ Stored in localStorage:
 - `playmusic-playerbar-height` — last drag-resized player bar height
 - `playmusic-videopane-width` — last drag-resized video pane width
 - `playmusic-online-platform` — the selected ONLINE tab (youtube or twitch)
+- `playmusic-history` — the watch history (`online.history`)
+- `playmusic-history-collapsed` — whether the HISTORY section is folded
 
 Cover thumbnails are cached in the OS app cache dir (cleared if the app is uninstalled).
 
 ## Constants & Utilities
 
 - `src/constants.ts` — `VIDEO_EXTS`, `AUDIO_EXTS`, `isVideo()`, `isAudio()`
-- `src/utils/filterDirs.ts` — fuzzy search via Fuse.js with weighted fields
+- `src/utils/filterDirs.ts` — fuzzy search via Fuse.js with weighted fields; `filterHistory.ts` does the same for HISTORY
 - `src/utils/trackName.ts` — `displayName()`: file name without extension or the YouTube/Twitch `[id]`
 - `src/utils/format.ts` — `formatDuration()`, `formatRelative()`
 - `src/components/TrackRow.tsx` / `TrackCover.tsx` — the one row layout and cover tile shared by

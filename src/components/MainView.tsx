@@ -1,28 +1,32 @@
 import { useEffect } from 'react'
 import { listen } from '@tauri-apps/api/event'
+import { HistorySection } from './HistorySection'
 import { Library } from './Library'
 import { OnlineSection } from './OnlineSection'
 import { ScrollToActive } from './ScrollToActivate'
 import { useScan } from '../hooks/useScan'
 import { useDurations } from '../hooks/useDurations'
+import { useWatchHistory } from '../hooks/useWatchHistory'
 import { SCROLL_ROOT_ID } from '../hooks/useCoverArt'
 import { useAppStore } from '../store'
 import { downloadKey } from '../api/online'
 import { DownloadProgress } from '../types'
 
 /**
- * The one content view: the library (filtered by the search box) and, while searching, the
- * YouTube results under it. Scrolls as a whole.
+ * The one content view: watched online items on top, the library (both filtered by the search
+ * box) and, while searching, the YouTube/Twitch results under it. Scrolls as a whole.
  */
 export function MainView() {
   useScan()
   useDurations()
   useDownloadProgress()
+  useWatchHistory()
 
   return (
     <div className="flex-1 relative overflow-hidden">
       <ScrollToActive />
       <div id={SCROLL_ROOT_ID} className="overflow-y-auto h-full py-2">
+        <HistorySection />
         <Library />
         <OnlineSection />
       </div>

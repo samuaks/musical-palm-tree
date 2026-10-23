@@ -22,6 +22,7 @@ export function useAudioPlayer(
   const track = useAppStore(selectCurrentTrack)
   const setStorePlaying = useAppStore((s) => s.setPlaying)
   const setResolving = useAppStore((s) => s.setResolving)
+  const setStreamFailed = useAppStore((s) => s.setStreamFailed)
   const setVideoActive = useAppStore((s) => s.setVideoActive)
   const onlineVideo = useAppStore((s) => s.online.video)
 
@@ -123,8 +124,11 @@ export function useAudioPlayer(
           src = stream.audio_url
           videoSrc = stream.video_url
           live = stream.live
+          setStreamFailed(track.platform, track.videoId, false)
         } catch (e) {
           console.error('failed to resolve stream:', e)
+          // e.g. a live channel from the history that's offline now
+          setStreamFailed(track.platform, track.videoId, true)
           if (!cancelled) {
             setResolving(false)
             setVideoActive(false)
@@ -218,6 +222,8 @@ export function useAudioPlayer(
         }
       } catch (e) {
         if (!cancelled) console.error('retry resolve failed:', e)
+        // a live stream that ended while it played
+        setStreamFailed(platform, videoId, true)
       } finally {
         if (!cancelled) setResolving(false)
       }

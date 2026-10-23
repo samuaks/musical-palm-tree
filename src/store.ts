@@ -9,12 +9,17 @@ import {
   YtDlpStatus,
   DownloadStatus,
   Platform,
+  HistoryEntry,
 } from './types'
 
 type Theme = 'dark' | 'light'
 
 const COLLAPSED_KEY = 'playmusic-collapsed'
 const ONLINE_PLATFORM_KEY = 'playmusic-online-platform'
+const HISTORY_KEY = 'playmusic-history'
+const HISTORY_COLLAPSED_KEY = 'playmusic-history-collapsed'
+/** Oldest entries drop off past this. */
+export const HISTORY_LIMIT = 50
 /** From when the app had separate Local/Online spaces; cleared at startup. */
 const LEGACY_ACTIVE_SPACE_KEY = 'playmusic-active-space'
 /** From when audio-only was a saved setting instead of per track; cleared at startup. */
@@ -41,6 +46,11 @@ interface OnlineState {
   searchError: string | null
   video: boolean // play the current online track with picture (back on for every new track)
   downloads: Record<string, DownloadStatus> // keyed by downloadKey(platform, videoId, kind)
+  history: HistoryEntry[] // watched online items, most recent first (persisted)
+  historyCollapsed: boolean // the HISTORY section is folded (persisted)
+  // streams that couldn't be resolved the last time they were played (a live channel that's
+  // offline), keyed by streamKey(platform, videoId)
+  failedStreams: Set<string>
 }
 
 interface AppState {
@@ -94,6 +104,11 @@ interface AppState {
   setOnlinePlatform: (platform: Platform) => void
   setDownload: (key: string, status: DownloadStatus) => void
   setDownloadPercent: (key: string, percent: number | null) => void
+  addToHistory: (entry: HistoryEntry) => void
+  removeFromHistory: (platform: Platform, videoId: string) => void
+  clearHistory: () => void
+  toggleHistoryCollapsed: () => void
+  setStreamFailed: (platform: Platform, videoId: string, failed: boolean) => void
 }
 
 export const useAppStore = create<AppState>((set) => {
@@ -130,6 +145,10 @@ export const useAppStore = create<AppState>((set) => {
       searchError: null,
       video: true,
       downloads: {},
+      history: loadHistory(),
+      historyCollapsed:
+        typeof window !== 'undefined' && localStorage.getItem(HISTORY_COLLAPSED_KEY) === 'true',
+      failedStreams: new Set(),
     },
 
     setQuery: (query) => set({ query }),
@@ -207,8 +226,65 @@ export const useAppStore = create<AppState>((set) => {
         if (current?.state !== 'downloading') return {}
         return { downloads: { ...s.online.downloads, [key]: { ...current, percent } } }
       }),
+
+    // Watching something again moves it to the top.
+    addToHistory: (entry) =>
+      setOnline((s) => {
+        const rest = s.online.history.filter(
+          (e) => e.platform !== entry.platform || e.video_id !== entry.video_id
+        )
+        return { history: saveHistory([entry, ...rest].slice(0, HISTORY_LIMIT)) }
+      }),
+    removeFromHistory: (platform, videoId) =>
+      setOnline((s) => ({
+        history: saveHistory(
+          s.online.history.filter((e) => e.platform !== platform || e.video_id !== videoId)
+        ),
+      })),
+    clearHistory: () => setOnline(() => ({ history: saveHistory([]) })),
+    toggleHistoryCollapsed: () =>
+      setOnline((s) => {
+        const historyCollapsed = !s.online.historyCollapsed
+        localStorage.setItem(HISTORY_COLLAPSED_KEY, String(historyCollapsed))
+        return { historyCollapsed }
+      }),
+    setStreamFailed: (platform, videoId, failed) =>
+      setOnline((s) => {
+        const key = streamKey(platform, videoId)
+        if (s.online.failedStreams.has(key) === failed) return {}
+        const failedStreams = new Set(s.online.failedStreams)
+        if (failed) failedStreams.add(key)
+        else failedStreams.delete(key)
+        return { failedStreams }
+      }),
   }
 })
+
+/** Store key for one online stream, for `online.failedStreams`. */
+export function streamKey(platform: Platform, videoId: string): string {
+  return `${platform}:${videoId}`
+}
+
+function saveHistory(history: HistoryEntry[]): HistoryEntry[] {
+  localStorage.setItem(HISTORY_KEY, JSON.stringify(history))
+  return history
+}
+
+function loadHistory(): HistoryEntry[] {
+  if (typeof window === 'undefined') return []
+  try {
+    const parsed = JSON.parse(localStorage.getItem(HISTORY_KEY) ?? '[]')
+    if (!Array.isArray(parsed)) return []
+    return parsed.filter(
+      (e): e is HistoryEntry =>
+        (e?.platform === 'youtube' || e?.platform === 'twitch') &&
+        typeof e.video_id === 'string' &&
+        typeof e.title === 'string'
+    )
+  } catch {
+    return []
+  }
+}
 
 function loadCollapsed(): Set<string> {
   try {
