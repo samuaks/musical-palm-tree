@@ -21,7 +21,8 @@ export function Header() {
   }
 
   return (
-    <div className="shrink-0 px-6 pt-5 pb-4 border-b border-app-border">
+    // z-10 so its shadow falls over the list below
+    <div className="shrink-0 relative z-10 px-6 pt-5 pb-4 bg-app-bar border-b border-app-border shadow-[0_4px_12px_var(--color-app-bar-shadow)]">
       <div className="flex items-start gap-4">
         <div className="flex-1 min-w-0 flex flex-col gap-4">
           {/* stats row */}

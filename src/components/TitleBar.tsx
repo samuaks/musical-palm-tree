@@ -7,7 +7,7 @@ export function Titlebar() {
   return (
     <div
       data-tauri-drag-region
-      className="h-8 flex items-stretch justify-between border-b border-app-border select-none shrink-0"
+      className="h-8 flex items-stretch justify-between bg-app-bar border-b border-app-border select-none shrink-0"
     >
       <div
         data-tauri-drag-region

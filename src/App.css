@@ -4,6 +4,9 @@
   /* surfaces — semi-transparent so gradient bleeds through; neutral slate like the background */
   --color-app-bg: rgba(22, 23, 30, 0.6);
   --color-app-surface: rgba(16, 17, 23, 0.7);
+  /* title/search bar and player bar — deeper than the list so they read as their own surfaces */
+  --color-app-bar: rgba(13, 14, 19, 0.78);
+  --color-app-bar-shadow: rgba(0, 0, 0, 0.35);
 
   /* hover/selected — cool blue-tinted overlays */
   --color-app-hover: rgba(255, 255, 255, 0.06);
@@ -31,6 +34,10 @@
   /* surfaces — warm cream paper rather than white, easier on the eyes */
   --color-app-bg: rgba(250, 246, 239, 0.85);
   --color-app-surface: rgba(252, 249, 243, 0.95);
+  /* bars are raised paper, lighter than the list: a deeper cream would drop muted and accent
+     text below 4.5:1 */
+  --color-app-bar: rgba(253, 251, 247, 0.92);
+  --color-app-bar-shadow: rgba(60, 40, 20, 0.1);
 
   /* hover/selected — warm wash, red tint for the selection */
   --color-app-hover: rgba(60, 40, 20, 0.07);
