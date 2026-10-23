@@ -399,6 +399,10 @@ localStorage and applies via `document.documentElement.dataset.theme`.
 Background gradients on `body` provide visual depth that's preserved by
 translucent panel surfaces (`bg-app-bg/80`).
 
+The title bar, header and player bar sit on their own surface, `bg-app-bar`, with a soft
+`--color-app-bar-shadow` toward the list, so they don't blend into it: deeper than the list in the
+dark theme, lighter (raised paper) in the light theme, where a deeper cream would cost text contrast.
+
 ## Custom Window Chrome
 
 - `tauri.conf.json` — `transparent: true, decorations: false`
