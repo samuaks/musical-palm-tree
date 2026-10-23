@@ -163,3 +163,14 @@ src-tauri/src/
 - **Never commit to `release`.** Pushing there publishes installers for every platform.
 - Keep PRs small and focused, with a clear explanation, verification notes (what you ran)
   and screenshots for UI changes.
+
+## Shipping tasks with review
+
+- The `ship-task` skill (`.claude/skills/ship-task/`) takes tasks to open PRs: implement, run
+  the checks, get a `VERDICT: PASS` from the `reviewer` agent (`.claude/agents/reviewer.md`),
+  revise for at most 3 review rounds, then open the PR. Several tasks get one session and
+  worktree each.
+- The reviewer only reads and runs checks; it never edits. It can't judge looks, so UI PRs
+  still need a visual check by a person.
+- Each new worktree needs `bun install` and `bun run build`, and a cold Rust build if it touches
+  `src-tauri/`. Only one `tauri dev` can run at a time (port 1420).
