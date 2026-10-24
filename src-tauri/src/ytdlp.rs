@@ -133,7 +133,7 @@ pub async fn run_streaming(
 /// `None` if there's nothing newer. An outdated bundled copy is superseded by a managed one, so
 /// this looks it up again.
 async fn updated_copy(app: &AppHandle, found: &Found) -> Option<Found> {
-    if update_due(app, RETRY_UPDATE_EVERY) && update(app, found).await {
+    if update_due(app, RETRY_UPDATE_EVERY) && update(app, found, RETRY_UPDATE_EVERY).await {
         locate(app)
     } else {
         None
@@ -144,7 +144,7 @@ async fn updated_copy(app: &AppHandle, found: &Found) -> Option<Found> {
 pub async fn auto_update(app: AppHandle) {
     if let Some(found) = locate(&app) {
         if update_due(&app, UPDATE_EVERY) {
-            update(&app, &found).await;
+            update(&app, &found, UPDATE_EVERY).await;
         }
     }
 }
@@ -215,7 +215,10 @@ async fn exec_streaming(
 ///
 /// This reuses the verified install download instead of `yt-dlp -U`, which goes through
 /// GitHub's rate-limited API, skips our checksum check, and can't write to an install dir.
-async fn update(app: &AppHandle, found: &Found) -> bool {
+///
+/// `interval` is how old the last check must be: it's checked again under the lock, so failed
+/// runs that end together (e.g. the live checks of several offline channels) check once.
+async fn update(app: &AppHandle, found: &Found, interval: Duration) -> bool {
     if found.source == Source::External {
         return false;
     }
@@ -223,6 +226,9 @@ async fn update(app: &AppHandle, found: &Found) -> bool {
         return false;
     };
     let _lock = BINARY.write().await;
+    if !update_due(app, interval) {
+        return false; // another run just checked
+    }
     let Ok(release) = latest_release().await else {
         return false; // e.g. offline; try again next time
     };

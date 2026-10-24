@@ -33,7 +33,8 @@ export function CurrentPage() {
     case 'folder':
       return <FolderPage path={view.path} />
     case 'channel':
-      return <ChannelPage name={view.name} />
+      // keyed: each channel starts fresh (its own refresh count and listing)
+      return <ChannelPage key={view.name} name={view.name} />
   }
 }
 

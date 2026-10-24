@@ -78,6 +78,7 @@ Rust, and Rust handles heavier filesystem and media work.
 │ Library │ nav.view, or search results │ (right side, when │
 │ Recently │ while the box has text │ a video plays) │
 │ Folders… │ │ │
+│ Channels… │ │ │
 ├────────────┴───────────────────────────────┴────────────────────┤
 │ Player Bar (now playing · controls over waveform · volume) │
 └─────────────────────────────────────────────────────────────────┘
@@ -213,14 +214,16 @@ const dirs = useAppStore((s) => s.library.dirs)
 ## Component Hierarchy
 
 App.tsx
-├── Sidebar ← pages and local folders (navigate)
+├── Sidebar ← pages, local folders, CHANNELS with live dots (navigate)
 ├── TopBar ← ‹ ›, search box (Enter searches online), activity, ThemeToggle, window controls
 ├── (main row)
-│ ├── MainView ← runs the scan, durations, download-progress and play-log hooks
+│ ├── MainView ← runs the scan, durations, download-progress, play-log and live-status hooks
 │ │ ├── ScrollToActive
 │ │ └── CurrentPage (pages/Pages.tsx) ← Home / Explore / Library / Recently played / Most
-│ │ │ listened / folder, or the search page while the query isn't empty, built from:
+│ │ │ listened / folder / channel, or the search page while the query isn't empty, built from:
 │ │ ├── PageHeader ← page title and subtitle
+│ │ ├── ChannelPage ← a Twitch channel: live stream + VODs (ResultRow), refresh
+│ │ ├── YourChannels (Explore) ← your Twitch channels as chips
 │ │ ├── MostListenedTiles / MostListenedList (PlayLog.tsx) ← top of the last 30 days
 │ │ ├── RecentlyPlayed (PlayLog.tsx) ← RECENTLY PLAYED (filtered, foldable, `limit`)
 │ │ │ └── PlayList → Track (library) / OnlinePlayRow (online) + remove

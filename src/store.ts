@@ -154,6 +154,7 @@ interface AppState {
   setDownloadPercent: (key: string, percent: number | null) => void
   setStreamFailed: (platform: Platform, videoId: string, failed: boolean) => void
   setLiveChannels: (names: string[]) => void
+  setChannelLive: (name: string, live: boolean) => void
 }
 
 export const useAppStore = create<AppState>((set) => {
@@ -329,6 +330,15 @@ export const useAppStore = create<AppState>((set) => {
         return { failedStreams }
       }),
     setLiveChannels: (names) => setOnline(() => ({ liveChannels: new Set(names) })),
+    // a channel's own listing knows better than the last 5-minute check
+    setChannelLive: (name, live) =>
+      setOnline((s) => {
+        if (s.online.liveChannels.has(name) === live) return {}
+        const liveChannels = new Set(s.online.liveChannels)
+        if (live) liveChannels.add(name)
+        else liveChannels.delete(name)
+        return { liveChannels }
+      }),
   }
 })
 

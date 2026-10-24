@@ -28,9 +28,9 @@ function listChannel(name: string): Promise<OnlineSearchResult[]> {
 }
 
 type Listing =
-  | { name: string; state: 'loading' }
-  | { name: string; state: 'done'; results: OnlineSearchResult[] }
-  | { name: string; state: 'error'; error: string }
+  | { state: 'loading' }
+  | { state: 'done'; results: OnlineSearchResult[] }
+  | { state: 'error'; error: string }
 
 /**
  * A Twitch channel (from the sidebar's CHANNELS): its live stream on top, if it's live, then its
@@ -41,31 +41,34 @@ export function ChannelPage({ name }: { name: string }) {
   const liveDot = useAppStore((s) => s.online.liveChannels.has(name))
   const onlineReady = useAppStore((s) => s.ytDlp?.available !== false)
   const playTrackFromList = useAppStore((s) => s.playTrackFromList)
-  const [listing, setListing] = useState<Listing>({ name, state: 'loading' })
+  const setChannelLive = useAppStore((s) => s.setChannelLive)
+  // the page is keyed by channel (Pages.tsx), so this state is always this channel's
+  const [current, setCurrent] = useState<Listing>({ state: 'loading' })
   const [reload, setReload] = useState(0)
 
   useEffect(() => {
+    if (!onlineReady) return
     const cached = listings.get(name)
     if (reload === 0 && cached && Date.now() - cached.at < FRESH_MS) {
-      setListing({ name, state: 'done', results: cached.results })
+      setCurrent({ state: 'done', results: cached.results })
       return
     }
     let cancelled = false
-    setListing({ name, state: 'loading' })
+    setCurrent({ state: 'loading' })
     listChannel(name)
       .then((results) => {
-        if (!cancelled) setListing({ name, state: 'done', results })
+        // a live stream comes first in the listing; the sidebar's dot follows it
+        setChannelLive(name, results[0]?.live === true)
+        if (!cancelled) setCurrent({ state: 'done', results })
       })
       .catch((e) => {
-        if (!cancelled) setListing({ name, state: 'error', error: String(e) })
+        if (!cancelled) setCurrent({ state: 'error', error: String(e) })
       })
     return () => {
       cancelled = true
     }
-  }, [name, reload])
+  }, [name, reload, onlineReady])
 
-  // a listing for another channel is still on screen for a moment after switching
-  const current = listing.name === name ? listing : { name, state: 'loading' as const }
   const results = current.state === 'done' ? current.results : []
   const live = current.state === 'done' ? results[0]?.live === true : liveDot
 
