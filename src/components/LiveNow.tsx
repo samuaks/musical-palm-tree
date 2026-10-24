@@ -15,6 +15,7 @@ export function LiveNow() {
   const channels = useTwitchChannels()
   const liveStreams = useAppStore((s) => s.online.liveStreams)
   const checkedAt = useAppStore((s) => s.online.liveCheckedAt)
+  const checking = useAppStore((s) => s.online.liveChecking)
   const checkLiveNow = useAppStore((s) => s.checkLiveNow)
   const onlineReady = useAppStore((s) => s.ytDlp?.available === true)
   if (!onlineReady || channels.length === 0) return null
@@ -37,18 +38,21 @@ export function LiveNow() {
         <div className="flex-1 h-px bg-app-border" />
         <button
           onClick={checkLiveNow}
-          title={checkedAt ? `checked ${formatRelative(checkedAt)}` : 'checking...'}
+          disabled={checking}
+          title={checking ? 'checking...' : checkedAt ? `checked ${formatRelative(checkedAt)}` : ''}
           className="flex items-center gap-1.5 text-xs font-mono text-app-secondary hover:text-app-text shrink-0 transition-colors"
         >
-          <RefreshCw size={12} className={checkedAt ? '' : 'animate-spin'} />
-          {checkedAt ? formatRelative(checkedAt) : 'checking'}
+          <RefreshCw size={12} className={checking ? 'animate-spin' : ''} />
+          {checking ? 'checking' : checkedAt ? formatRelative(checkedAt) : 'check'}
         </button>
       </div>
 
       {live.length === 0 ? (
         <div className="px-6 py-1 text-xs font-mono text-app-muted">
           {checkedAt
-            ? `none of your ${channels.length} channels are live right now.`
+            ? channels.length === 1
+              ? `${channels[0].display} isn't live right now.`
+              : `none of your ${channels.length} channels are live right now.`
             : 'checking which of your channels are live...'}
         </div>
       ) : (

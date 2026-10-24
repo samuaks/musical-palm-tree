@@ -53,6 +53,7 @@ export function useTwitchLiveStatus() {
     const names = key.split(',')
     let cancelled = false
     function check() {
+      useAppStore.getState().setLiveChecking(true)
       twitchLiveStatus(names)
         .then((streams) => {
           if (cancelled) return
@@ -63,13 +64,22 @@ export function useTwitchLiveStatus() {
           })
           useAppStore.getState().setLiveStreams(live)
         })
-        .catch((e) => console.error('live check failed:', e))
+        .catch((e) => {
+          console.error('live check failed:', e)
+          // keep the last streams, but stop saying "checking"
+          const { online, setLiveStreams } = useAppStore.getState()
+          if (!cancelled) setLiveStreams([...online.liveStreams])
+        })
+        .finally(() => {
+          if (!cancelled) useAppStore.getState().setLiveChecking(false)
+        })
     }
     check()
     const timer = setInterval(check, LIVE_CHECK_EVERY_MS)
     return () => {
       cancelled = true
       clearInterval(timer)
+      useAppStore.getState().setLiveChecking(false)
     }
   }, [ready, key, requested])
 }

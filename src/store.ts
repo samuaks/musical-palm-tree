@@ -79,6 +79,7 @@ interface OnlineState {
   hiddenChannels: Set<string>
   liveCheck: number // bumped to check the channels again now
   liveCheckedAt: number | null // when the last check came back (Unix ms)
+  liveChecking: boolean // a check is running
   // streams that couldn't be resolved the last time they were played (a live channel that's
   // offline), keyed by streamKey(platform, videoId)
   failedStreams: Set<string>
@@ -164,6 +165,7 @@ interface AppState {
   hideChannel: (name: string) => void
   unhideChannel: (name: string) => void
   checkLiveNow: () => void
+  setLiveChecking: (checking: boolean) => void
 }
 
 export const useAppStore = create<AppState>((set) => {
@@ -208,6 +210,7 @@ export const useAppStore = create<AppState>((set) => {
       hiddenChannels: loadHiddenChannels(),
       liveCheck: 0,
       liveCheckedAt: null,
+      liveChecking: false,
     },
 
     setQuery: (query) => set({ query }),
@@ -367,7 +370,10 @@ export const useAppStore = create<AppState>((set) => {
         saveHiddenChannels(hiddenChannels)
         return { hiddenChannels }
       }),
-    checkLiveNow: () => setOnline((s) => ({ liveCheck: s.online.liveCheck + 1 })),
+    // not while a check is running: each one starts up to 10 yt-dlp processes
+    checkLiveNow: () =>
+      setOnline((s) => (s.online.liveChecking ? {} : { liveCheck: s.online.liveCheck + 1 })),
+    setLiveChecking: (liveChecking) => setOnline(() => ({ liveChecking })),
   }
 })
 
