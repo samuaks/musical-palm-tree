@@ -211,13 +211,15 @@ async fn exec_streaming(
 
 /// If the copy in use is older than the newest release, installs that release as the
 /// managed copy: in place for a managed copy, or alongside an outdated bundled one, which
-/// `locate` then stops using. External copies are left alone. Returns whether it installed.
+/// `locate` then stops using. External copies are left alone. Returns whether to retry: it
+/// installed a newer copy, or another run checked while this one waited for the lock.
 ///
 /// This reuses the verified install download instead of `yt-dlp -U`, which goes through
 /// GitHub's rate-limited API, skips our checksum check, and can't write to an install dir.
 ///
 /// `interval` is how old the last check must be: it's checked again under the lock, so failed
-/// runs that end together (e.g. the live checks of several offline channels) check once.
+/// runs that end together (e.g. the live checks of several offline channels) check once, and
+/// the others retry with the copy that check left in place.
 async fn update(app: &AppHandle, found: &Found, interval: Duration) -> bool {
     if found.source == Source::External {
         return false;
@@ -227,7 +229,7 @@ async fn update(app: &AppHandle, found: &Found, interval: Duration) -> bool {
     };
     let _lock = BINARY.write().await;
     if !update_due(app, interval) {
-        return false; // another run just checked
+        return true; // another run just checked, and may have installed a newer copy
     }
     let Ok(release) = latest_release().await else {
         return false; // e.g. offline; try again next time
