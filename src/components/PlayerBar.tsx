@@ -24,7 +24,7 @@ import { useCoverArt } from '../hooks/useCoverArt'
 import { displayName as trackDisplayName } from '../utils/trackName'
 import { TrackCover } from './TrackCover'
 
-const MIN_HEIGHT = 160
+const MIN_HEIGHT = 128
 
 function formatTime(s: number) {
   // e.g. the VOD of a broadcast that's still going has no fixed length yet
@@ -57,6 +57,8 @@ export function PlayerBar() {
   const onlineVideo = useAppStore((s) => s.online.video)
   const setOnlineVideo = useAppStore((s) => s.setOnlineVideo)
   const cover = useCoverArt(track)
+  const subtitle =
+    track?.source === 'online' ? (track.uploader ?? track.platform) : track ? 'local file' : ''
 
   useEffect(() => {
     const path = track?.source === 'local' ? track.path : null
@@ -91,105 +93,122 @@ export function PlayerBar() {
           <div className="absolute top-1/2 left-0 right-0 h-px -translate-y-1/2 group-hover:bg-app-accent-dim transition-colors" />
         </div>
 
-        {/* top row — track info + controls */}
-        <div className="flex items-center px-6 pt-3 pb-2 gap-4">
-          <TrackCover src={cover} video={trackIsVideo} size={44} />
-          <div className="flex flex-col min-w-0 flex-1">
-            <span className="text-sm font-mono text-app-accent truncate">{displayName}</span>
-            <span className="text-xs font-mono text-app-muted tabular-nums">
-              {live
-                ? // the LIVE badge is in the seek bar's place below
-                  (track.uploader ?? 'Live broadcast')
-                : `${formatTime(currentTime)} / ${formatTime(duration)}`}
-            </span>
+        {/* now playing · controls over the waveform · volume and video */}
+        <div className="flex-1 min-h-0 grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)_minmax(0,1fr)] items-center gap-8 px-6 py-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <TrackCover src={cover} video={trackIsVideo} size={52} />
+            <div className="flex flex-col min-w-0">
+              <span className="text-[10px] font-mono text-app-accent tracking-[0.2em] uppercase">
+                {live ? 'live now' : 'now playing'}
+              </span>
+              <span className="text-sm font-mono text-app-text truncate">{displayName}</span>
+              <span className="text-xs font-mono text-app-muted truncate">{subtitle}</span>
+            </div>
           </div>
 
-          <div className="flex items-center gap-4">
-            <button
-              onClick={prev}
-              className="text-app-secondary hover:text-app-text transition-colors"
-            >
-              <SkipBack size={16} />
-            </button>
+          <div className="flex flex-col h-full min-h-0 gap-1">
+            <div className="flex items-center justify-center gap-5">
+              <button
+                onClick={prev}
+                className="text-app-secondary hover:text-app-text transition-colors"
+                title="Previous"
+                aria-label="Previous"
+              >
+                <SkipBack size={16} />
+              </button>
 
-            <button
-              onClick={toggle}
-              disabled={resolving}
-              className="w-10 h-10 rounded-full bg-app-accent text-app-bg flex items-center justify-center hover:scale-105 transition-transform"
-            >
-              {resolving ? <Loader2 className="animate-spin" /> : playing ? <Pause /> : <Play />}
-            </button>
+              <button
+                onClick={toggle}
+                disabled={resolving}
+                className="w-10 h-10 rounded-full bg-app-accent text-app-bg flex items-center justify-center hover:scale-105 transition-transform"
+              >
+                {resolving ? <Loader2 className="animate-spin" /> : playing ? <Pause /> : <Play />}
+              </button>
 
-            <button
-              onClick={next}
-              className="text-app-secondary hover:text-app-text transition-colors"
-            >
-              <SkipForward size={16} />
-            </button>
+              <button
+                onClick={next}
+                className="text-app-secondary hover:text-app-text transition-colors"
+                title="Next"
+                aria-label="Next"
+              >
+                <SkipForward size={16} />
+              </button>
 
-            <button
-              onClick={stop}
-              className="text-app-secondary hover:text-app-text transition-colors"
-              title="Stop"
-              aria-label="Stop"
-            >
-              <Square size={14} />
-            </button>
+              <button
+                onClick={stop}
+                className="text-app-secondary hover:text-app-text transition-colors"
+                title="Stop"
+                aria-label="Stop"
+              >
+                <Square size={14} />
+              </button>
+            </div>
+
+            <div className="flex-1 min-h-6 flex items-center gap-3 text-[11px] font-mono text-app-muted tabular-nums">
+              {live ? (
+                <div className="flex-1 h-full">
+                  <LiveIndicator />
+                </div>
+              ) : (
+                <>
+                  <span className="w-10 text-right shrink-0">{formatTime(currentTime)}</span>
+                  <div className="flex-1 h-full min-w-0">
+                    <Waveform
+                      data={waveformData}
+                      currentTime={currentTime}
+                      duration={duration}
+                      onSeek={seek}
+                    />
+                  </div>
+                  <span className="w-10 shrink-0">{formatTime(duration)}</span>
+                </>
+              )}
+            </div>
           </div>
 
-          <div className="flex items-center gap-3 flex-1 justify-end">
-            <button
-              onClick={toggleMute}
-              className="text-app-muted hover:text-app-text transition-colors"
-            >
-              {volume === 0 ? <VolumeX size={14} /> : <Volume2 size={14} />}
-            </button>
-            <input
-              type="range"
-              min={0}
-              max={1}
-              step={0.01}
-              value={volume}
-              onChange={(e) => changeVolume(Number(e.target.value))}
-              onMouseUp={(e) => (e.target as HTMLInputElement).blur()}
-              className="w-24 accent-app-accent"
-            />
+          <div className="flex items-center justify-end gap-4">
+            {track?.source === 'online' && (
+              <button
+                onClick={() => setOnlineVideo(!onlineVideo)}
+                className={`transition-colors ${
+                  onlineVideo ? 'text-app-accent' : 'text-app-muted hover:text-app-text'
+                }`}
+                title={onlineVideo ? 'Audio only' : 'Play video'}
+              >
+                {onlineVideo ? <Video size={14} /> : <VideoOff size={14} />}
+              </button>
+            )}
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={toggleMute}
+                className="text-app-muted hover:text-app-text transition-colors"
+                title={volume === 0 ? 'Unmute' : 'Mute'}
+              >
+                {volume === 0 ? <VolumeX size={14} /> : <Volume2 size={14} />}
+              </button>
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.01}
+                value={volume}
+                onChange={(e) => changeVolume(Number(e.target.value))}
+                onMouseUp={(e) => (e.target as HTMLInputElement).blur()}
+                className="w-24 accent-app-accent"
+              />
+            </div>
+
+            {track && trackIsVideo && (
+              <button
+                onClick={toggleFullscreen}
+                className="text-app-muted hover:text-app-text transition-colors"
+                title="Fullscreen"
+              >
+                <Maximize size={14} />
+              </button>
+            )}
           </div>
-
-          {track?.source === 'online' && (
-            <button
-              onClick={() => setOnlineVideo(!onlineVideo)}
-              className={`transition-colors ${
-                onlineVideo ? 'text-app-accent' : 'text-app-muted hover:text-app-text'
-              }`}
-              title={onlineVideo ? 'Audio only' : 'Play video'}
-            >
-              {onlineVideo ? <Video size={14} /> : <VideoOff size={14} />}
-            </button>
-          )}
-
-          {track && trackIsVideo && (
-            <button
-              onClick={toggleFullscreen}
-              className="text-app-muted  hover:text-app-text transition-colors"
-              title="Fullscreen"
-            >
-              <Maximize size={14} />
-            </button>
-          )}
-        </div>
-
-        <div className="flex-1 px-6 pb-2 min-h-0" style={{ height: '72px' }}>
-          {live ? (
-            <LiveIndicator />
-          ) : (
-            <Waveform
-              data={waveformData}
-              currentTime={currentTime}
-              duration={duration}
-              onSeek={seek}
-            />
-          )}
         </div>
 
         <div className="flex items-center gap-4 px-6 py-1.5 border-t border-app-border text-[10px] font-mono text-app-muted">
