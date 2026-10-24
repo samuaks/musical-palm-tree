@@ -35,9 +35,12 @@ export async function searchOnline(
   return invoke<OnlineSearchResult[]>('search_online', { query: trimmed, platform })
 }
 
-/** Whether each Twitch channel (login name) is live right now; the first 10 are checked. */
-export async function twitchLiveStatus(channels: string[]): Promise<boolean[]> {
-  return invoke<boolean[]>('twitch_live_status', { channels })
+/**
+ * Each Twitch channel's (login name) live stream right now, or null when it's offline; the
+ * first 10 are checked.
+ */
+export async function twitchLiveStatus(channels: string[]): Promise<(OnlineSearchResult | null)[]> {
+  return invoke<(OnlineSearchResult | null)[]>('twitch_live_status', { channels })
 }
 
 let searchSeq = 0

@@ -230,14 +230,15 @@ fn channel_url(name: &str) -> Option<String> {
 /// The most channels one `twitch_live_status` call checks (one yt-dlp each, in parallel).
 const LIVE_STATUS_LIMIT: usize = 10;
 
-/// Whether each Twitch channel is live right now, in the same order; for the sidebar's channel
-/// dots. Checks the first `LIVE_STATUS_LIMIT` in parallel (~1.8 s); the rest, invalid names and
-/// failed checks are `false`.
+/// Each Twitch channel's live stream right now (title, preview, `live:<channel>` id), in the
+/// same order, or `None` when it's offline; for the sidebar's live dots and Home's "live now".
+/// Checks the first `LIVE_STATUS_LIMIT` in parallel (~1.8 s); the rest, invalid names and failed
+/// checks are `None`.
 #[tauri::command]
 pub async fn twitch_live_status(
     app: tauri::AppHandle,
     channels: Vec<String>,
-) -> Result<Vec<bool>, String> {
+) -> Result<Vec<Option<OnlineSearchResult>>, String> {
     let checks: Vec<_> = channels
         .iter()
         .take(LIVE_STATUS_LIMIT)
@@ -245,22 +246,19 @@ pub async fn twitch_live_status(
             let app = app.clone();
             let name = name.to_ascii_lowercase();
             tauri::async_runtime::spawn(async move {
-                let Some(url) = channel_url(&name) else {
-                    return false;
-                };
-                match ytdlp::run(&app, &live_check_args(&url)).await {
-                    Ok(stdout) => parse_live(&stdout, &name).is_some(),
-                    Err(_) => false, // offline, or the check failed
-                }
+                let url = channel_url(&name)?;
+                // an error: offline, or the check failed
+                let stdout = ytdlp::run(&app, &live_check_args(&url)).await.ok()?;
+                parse_live(&stdout, &name)
             })
         })
         .collect();
 
     let mut live = Vec::with_capacity(channels.len());
     for check in checks {
-        live.push(check.await.unwrap_or(false));
+        live.push(check.await.ok().flatten());
     }
-    live.resize(channels.len(), false);
+    live.resize_with(channels.len(), || None);
     Ok(live)
 }
 

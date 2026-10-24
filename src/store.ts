@@ -42,6 +42,7 @@ const NAV_HISTORY_LIMIT = 50
 const COLLAPSED_KEY = 'playmusic-collapsed'
 const ONLINE_PLATFORM_KEY = 'playmusic-online-platform'
 const PLAYS_KEY = 'playmusic-plays'
+const HIDDEN_CHANNELS_KEY = 'playmusic-hidden-channels'
 const RECENT_COLLAPSED_KEY = 'playmusic-recent-collapsed'
 /** The online-only watch history, migrated into the play log once; cleared at startup. */
 const LEGACY_HISTORY_KEY = 'playmusic-history'
@@ -72,7 +73,13 @@ interface OnlineState {
   searchError: string | null
   video: boolean // play the current online track with picture (back on for every new track)
   downloads: Record<string, DownloadStatus> // keyed by downloadKey(platform, videoId, kind)
-  liveChannels: Set<string> // Twitch channels (login names) found live by the last check
+  // live streams of Twitch channels (login name → the stream), from the last check
+  liveStreams: Map<string, OnlineSearchResult>
+  // Twitch channels (login names) removed from Home, the sidebar and the live checks (persisted)
+  hiddenChannels: Set<string>
+  liveCheck: number // bumped to check the channels again now
+  liveCheckedAt: number | null // when the last check came back (Unix ms)
+  liveChecking: boolean // a check is running
   // streams that couldn't be resolved the last time they were played (a live channel that's
   // offline), keyed by streamKey(platform, videoId)
   failedStreams: Set<string>
@@ -153,8 +160,12 @@ interface AppState {
   setDownload: (key: string, status: DownloadStatus) => void
   setDownloadPercent: (key: string, percent: number | null) => void
   setStreamFailed: (platform: Platform, videoId: string, failed: boolean) => void
-  setLiveChannels: (names: string[]) => void
-  setChannelLive: (name: string, live: boolean) => void
+  setLiveStreams: (streams: [string, OnlineSearchResult][]) => void
+  setChannelLive: (name: string, stream: OnlineSearchResult | null) => void
+  hideChannel: (name: string) => void
+  unhideChannel: (name: string) => void
+  checkLiveNow: () => void
+  setLiveChecking: (checking: boolean) => void
 }
 
 export const useAppStore = create<AppState>((set) => {
@@ -195,7 +206,11 @@ export const useAppStore = create<AppState>((set) => {
       video: true,
       downloads: {},
       failedStreams: new Set(),
-      liveChannels: new Set(),
+      liveStreams: new Map(),
+      hiddenChannels: loadHiddenChannels(),
+      liveCheck: 0,
+      liveCheckedAt: null,
+      liveChecking: false,
     },
 
     setQuery: (query) => set({ query }),
@@ -329,16 +344,36 @@ export const useAppStore = create<AppState>((set) => {
         else failedStreams.delete(key)
         return { failedStreams }
       }),
-    setLiveChannels: (names) => setOnline(() => ({ liveChannels: new Set(names) })),
+    setLiveStreams: (streams) =>
+      setOnline(() => ({ liveStreams: new Map(streams), liveCheckedAt: Date.now() })),
     // a channel's own listing knows better than the last 5-minute check
-    setChannelLive: (name, live) =>
+    setChannelLive: (name, stream) =>
       setOnline((s) => {
-        if (s.online.liveChannels.has(name) === live) return {}
-        const liveChannels = new Set(s.online.liveChannels)
-        if (live) liveChannels.add(name)
-        else liveChannels.delete(name)
-        return { liveChannels }
+        if (!stream && !s.online.liveStreams.has(name)) return {}
+        const liveStreams = new Map(s.online.liveStreams)
+        if (stream) liveStreams.set(name, stream)
+        else liveStreams.delete(name)
+        return { liveStreams }
       }),
+    hideChannel: (name) =>
+      setOnline((s) => {
+        const hiddenChannels = new Set(s.online.hiddenChannels).add(name)
+        saveHiddenChannels(hiddenChannels)
+        const liveStreams = new Map(s.online.liveStreams)
+        liveStreams.delete(name)
+        return { hiddenChannels, liveStreams }
+      }),
+    unhideChannel: (name) =>
+      setOnline((s) => {
+        const hiddenChannels = new Set(s.online.hiddenChannels)
+        hiddenChannels.delete(name)
+        saveHiddenChannels(hiddenChannels)
+        return { hiddenChannels }
+      }),
+    // not while a check is running: each one starts up to 10 yt-dlp processes
+    checkLiveNow: () =>
+      setOnline((s) => (s.online.liveChecking ? {} : { liveCheck: s.online.liveCheck + 1 })),
+    setLiveChecking: (liveChecking) => setOnline(() => ({ liveChecking })),
   }
 })
 
@@ -383,6 +418,21 @@ function loadPlays(): PlayEntry[] {
     return legacy === null ? [] : savePlays(migrateHistory(JSON.parse(legacy)))
   } catch {
     return []
+  }
+}
+
+function saveHiddenChannels(hidden: Set<string>) {
+  localStorage.setItem(HIDDEN_CHANNELS_KEY, JSON.stringify([...hidden]))
+}
+
+function loadHiddenChannels(): Set<string> {
+  if (typeof window === 'undefined') return new Set()
+  try {
+    const parsed = JSON.parse(localStorage.getItem(HIDDEN_CHANNELS_KEY) ?? '[]')
+    if (!Array.isArray(parsed)) return new Set()
+    return new Set(parsed.filter((n): n is string => typeof n === 'string' && isChannelName(n)))
+  } catch {
+    return new Set()
   }
 }
 

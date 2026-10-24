@@ -200,7 +200,7 @@ export function OnlineSection({ page = false }: { page?: boolean }) {
 /** One of your channels that looks like what's typed on the Twitch tab; opens its page. */
 function ChannelSuggestion({ name, display }: { name: string; display: string }) {
   const navigate = useAppStore((s) => s.navigate)
-  const live = useAppStore((s) => s.online.liveChannels.has(name))
+  const live = useAppStore((s) => s.online.liveStreams.has(name))
   return (
     <button
       onClick={() => navigate({ page: 'channel', name })}
