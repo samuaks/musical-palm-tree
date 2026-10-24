@@ -115,20 +115,13 @@ function LibraryPage() {
 }
 
 function RecentPage() {
-  const empty = useAppStore((s) => s.plays.length === 0)
   return (
     <>
       <PageHeader
         title="Recently played"
         subtitle="Your files, YouTube videos and Twitch streams, most recent first."
       />
-      {empty ? (
-        <div className="px-6 py-3 text-xs text-app-muted font-mono">
-          nothing yet: tracks and videos show up here after 30 seconds of playback.
-        </div>
-      ) : (
-        <RecentlyPlayed unfoldable />
-      )}
+      <RecentlyPlayed unfoldable />
     </>
   )
 }

@@ -46,11 +46,6 @@ export function mostListened(log: PlayEntry[], now: number, limit: number): Play
     .map(({ e }) => e)
 }
 
-/** The title a row shows: the online title, or the file name. */
-export function playTitle(entry: PlayEntry): string {
-  return entry.source === 'online' ? entry.title : entry.name
-}
-
 /** Entries matching the search box, fuzzy like `filterDirs`, kept in log order. */
 export function filterPlays(log: PlayEntry[], query: string): PlayEntry[] {
   if (!query) return log

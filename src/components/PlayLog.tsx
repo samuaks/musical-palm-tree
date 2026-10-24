@@ -79,7 +79,14 @@ export function RecentlyPlayed({
     [plays, query, index]
   )
   const shown = limit === undefined ? matching : matching.slice(0, limit)
-  if (shown.length === 0) return null
+  if (shown.length === 0) {
+    // on its own page, say so (also when every logged file has left the library)
+    return unfoldable && !query ? (
+      <div className="px-6 py-3 text-xs text-app-muted font-mono">
+        nothing yet: tracks and videos show up here after 30 seconds of playback.
+      </div>
+    ) : null
+  }
 
   return (
     <div className="mb-2">
