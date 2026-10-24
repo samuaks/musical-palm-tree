@@ -3,6 +3,7 @@ import {
   ChevronDown,
   ChevronRight,
   Compass,
+  Flame,
   Folder,
   FolderOpen,
   History,
@@ -40,6 +41,7 @@ export function Sidebar() {
         <div className="h-px bg-app-border mx-2 my-4" />
 
         <SectionTitle>your collection</SectionTitle>
+        <NavItem view={{ page: 'most' }} icon={<Flame size={16} />} label="Most listened" />
         <button
           onClick={() => setFoldersOpen(!foldersOpen)}
           className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm font-mono text-app-secondary hover:bg-app-hover hover:text-app-text transition-colors"

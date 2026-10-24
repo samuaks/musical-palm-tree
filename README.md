@@ -15,9 +15,15 @@ terminal player, and is meant as a learning-friendly codebase (the repository is
 
 **Layout**
 
-- A sidebar like YouTube Music's: **Home** (what you watched lately and the newest files in your
-  library), **Explore** (YouTube and Twitch), **Your library**, **Recently played**, and each
-  local folder under **Local folders**. The page you were on is reopened next time.
+- A sidebar like YouTube Music's: **Home**, **Explore** (YouTube and Twitch), **Your library**,
+  **Recently played**, then **Most listened** and each local folder under **Local folders**. The
+  page you were on is reopened next time.
+- **Home**: your **Most listened** of the last 30 days (with **play all**), what you played
+  lately, and the newest files in your library.
+- Anything that plays for 30 seconds (or half of a shorter track), from your library or online,
+  counts as played: it's listed under **Recently played** (most recent first; fold it, clear it
+  from its header, or remove single rows with ×) and ranks it in **Most listened**. Play counts
+  aren't shown.
 - A top bar with back/forward through the pages you visited and the search box (`Ctrl+K` to
   focus it, `Esc` to clear it and go back to the page).
 
@@ -35,7 +41,7 @@ terminal player, and is meant as a learning-friendly codebase (the repository is
 **Player**
 
 - Plays audio and video. Next/previous follow the list the track was picked from (library order,
-  the online results or the history), and the next track starts when one ends.
+  the online results, recently played or most listened), and the next track starts when one ends.
 - Stop (the square button, or `S`) ends playback and hides the player bar; it's hidden at startup
   too, and comes back as soon as you pick a track.
 - Cover art in the list and the player bar: the picture embedded in the file (mp3, flac, ogg, m4a),
@@ -60,10 +66,8 @@ terminal player, and is meant as a learning-friendly codebase (the repository is
     searched). If the channel is live right now, its stream is listed on top with a **LIVE**
     badge and plays live (no seeking, no recording).
   - Pasting a YouTube or Twitch link opens that video (or channel) on either tab.
-- What you watch online (for 30 seconds, or half of a shorter video) is listed under **Recently
-  played**, most recent first (the last 50), and the first five on Home. A live channel you
-  watched plays live again from there, or shows **offline**. Fold it from its header, clear it
-  there, or remove single rows with ×.
+- A live channel you watched is listed under **Recently played** as the channel: it plays live
+  again from there, or shows **offline**. Live channels aren't ranked in Most listened.
 - Streaming goes through [yt-dlp](https://github.com/yt-dlp/yt-dlp): video up to 1080p (Twitch:
   720p) in the video pane, or audio only with the video button in the player bar. Not needed for
   local files; see [Online search](#online-search-optional) below.

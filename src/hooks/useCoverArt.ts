@@ -95,12 +95,13 @@ function whenNearViewport(el: Element, load: () => void): () => void {
 
 /**
  * Cover for a library row: looked up only once the row is near the viewport, so a big library
- * doesn't ask Rust for every file's art at startup.
+ * doesn't ask Rust for every file's art at startup. `null` (an online item): no cover here.
  */
-export function useRowCover(path: string, ref: RefObject<Element | null>): string | null {
+export function useRowCover(path: string | null, ref: RefObject<Element | null>): string | null {
   const [loaded, setLoaded] = useState<{ path: string; src: string | null } | null>(null)
 
   useEffect(() => {
+    if (path === null) return
     // Keep a cached cover in state too, so the row still has it if the cache later evicts it.
     const cached = cache.get(path)
     if (cached !== undefined) {
@@ -121,6 +122,7 @@ export function useRowCover(path: string, ref: RefObject<Element | null>): strin
     }
   }, [path])
 
+  if (path === null) return null
   const cached = cache.get(path)
   if (cached !== undefined) return cached
   return loaded?.path === path ? loaded.src : null
