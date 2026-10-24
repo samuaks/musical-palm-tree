@@ -8,25 +8,34 @@ export function ScrollToActive() {
   const collapsed = useAppStore((s) => s.library.collapsed)
   const toggleCollapsed = useAppStore((s) => s.toggleLibraryCollapsed)
   const searching = useAppStore((s) => s.query.trim() !== '')
+  const view = useAppStore((s) => s.nav.view)
 
   const [offscreen, setOffscreen] = useState(false)
   const observer = useRef<IntersectionObserver | null>(null)
 
+  // Re-run on every page change too: the rows under the one scroll element are swapped
   useEffect(() => {
-    if (!currentTrack) {
-      setOffscreen(false)
-      return
-    }
+    setOffscreen(false)
+    if (!currentTrack) return
 
     function findAndObserve() {
       if (!currentTrack) return
       const el = document.querySelector(`[data-track-path="${CSS.escape(currentTrack.path)}"]`)
 
       if (!el) {
-        // A local track not in the list is in a collapsed album: show the button so the user
-        // can open it. A track filtered out by the search, or a YouTube result that isn't
-        // listed, has nowhere to scroll to.
-        setOffscreen(currentTrack.source === 'local' && !searching)
+        // A local track that this page lists but that isn't in the DOM is in a collapsed
+        // album: show the button so the user can open it. A track filtered out by the search,
+        // on another page, or an online item that isn't listed, has nowhere to scroll to.
+        const dir = useAppStore
+          .getState()
+          .library.dirs.find(
+            (d) =>
+              d.files.some((f) => f.path === currentTrack.path) ||
+              d.albums.some((a) => a.files.some((f) => f.path === currentTrack.path))
+          )
+        const pageLists =
+          view.page === 'library' || (view.page === 'folder' && dir?.path === view.path)
+        setOffscreen(currentTrack.source === 'local' && !searching && !!dir && pageLists)
         return
       }
 
@@ -44,7 +53,7 @@ export function ScrollToActive() {
       clearTimeout(timeout)
       observer.current?.disconnect()
     }
-  }, [currentTrack, collapsed, searching])
+  }, [currentTrack, collapsed, searching, view])
 
   function scrollToActive() {
     if (!currentTrack) return

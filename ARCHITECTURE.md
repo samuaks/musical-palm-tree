@@ -22,17 +22,19 @@ ideas, while using different stacks and interaction models.
 ## Overview
 
 PlayMusic Desktop is a Tauri 2 desktop app with a React frontend and Rust backend.
-It has one main view: your local library, and a single search box that filters it as you
-type and, when you press Enter, searches YouTube or lists a Twitch channel's VODs (through the
-optional yt-dlp). Local tracks and online results share the same playback infrastructure.
+It's laid out like YouTube Music: a sidebar of pages (Home, Explore, Your library, Recently
+played, and each local folder), a top bar with back/forward and a single search box that filters
+the library as you type and, when you press Enter, searches YouTube or lists a Twitch channel's
+VODs (through the optional yt-dlp). Local tracks and online results share the same playback
+infrastructure.
 
 ## How To Read This Project
 
 If you are new to this codebase, start with:
 
 1. `src/App.tsx` - top-level layout and persistent player shell
-2. `src/components/Header.tsx` - library stats and the search box
-3. `src/components/MainView.tsx` - the library and online sections
+2. `src/components/Sidebar.tsx` and `TopBar.tsx` - page navigation, the search box, window controls
+3. `src/components/MainView.tsx` and `pages/Pages.tsx` - the page for `nav.view`, or search results
 4. `src/components/OnlineSection.tsx` - YouTube/Twitch results, playing and downloading
 5. `src/components/PlayerBar.tsx` - playback controls, waveform, and media elements
 6. `src/store.ts` - global Zustand state and queue model
@@ -45,7 +47,7 @@ Rust, and Rust handles heavier filesystem and media work.
 
 ## Main User Flow
 
-1. The app opens with a desktop shell: titlebar, header, main view, video pane, and
+1. The app opens with a desktop shell: sidebar, top bar, the last page shown, video pane, and
    player bar.
 2. The library is scanned at startup through the Rust `scan_media` command; scan progress
    streams back to React via Tauri events.
@@ -69,25 +71,41 @@ Rust, and Rust handles heavier filesystem and media work.
 
 ## Top-Level Layout
 
-┌─────────────────────────────────────────────────┐
-│ Titlebar (custom — minimize/maximize/close) │
-├─────────────────────────────────────────────────┤
-│ Header (stats, search box, theme toggle) │
-├────────────────────────────┬────────────────────┤
-│ MainView │ Video Pane │
-│ HISTORY (filtered) │ │
-│ LIBRARY (filtered) │ (right side, when │
-│ ONLINE youtube|twitch │ a video plays) │
-├────────────────────────────┴────────────────────┤
-│ Player Bar │
-└─────────────────────────────────────────────────┘
+┌────────────┬────────────────────────────────────────────────────┐
+│ Sidebar │ TopBar (‹ › · search · theme · window controls) │
+│ Home ├───────────────────────────────┬────────────────────┤
+│ Explore │ MainView: the page for │ Video Pane │
+│ Library │ nav.view, or search results │ (right side, when │
+│ Recently │ while the box has text │ a video plays) │
+│ Folders… │ │ │
+├────────────┴───────────────────────────────┴────────────────────┤
+│ Player Bar (now playing · controls over waveform · volume) │
+└─────────────────────────────────────────────────────────────────┘
 
-## Main View and Search
+## Pages and Navigation
 
-There's one search box (`query` in the store), in `Header`:
+`nav` in the store holds the page (`nav.view`, persisted as `playmusic-view`) and the back and
+forward stacks. `navigate(view)` (the sidebar) pushes the current page onto `back`; ‹ and › in
+the top bar walk the stacks. Opening a page clears the search box, so the page shows instead of
+results. `pages/Pages.tsx` renders the view:
 
-- **Empty**: `MainView` shows the whole library (directories → albums → tracks).
-- **Typing**: `Library` filters with `filterDirs` (Fuse.js) and gets a `LIBRARY n` header.
+- **Home**: recently played (first 5, "see all") and the newest library files.
+- **Explore**: the YouTube/Twitch tabs and the last online search (`OnlineSection page`).
+- **Your library**: scan stats and the whole library. **A folder** (sidebar → Local folders):
+  just that folder (`Library only`).
+- **Recently played**: the watch history.
+
+`MainView` keeps one scroll element for every page (`SCROLL_ROOT_ID`, which the lazy-cover
+observer is rooted on) and scrolls it back to the top when the page or the search changes.
+
+## Search
+
+There's one search box (`query` in the store), in `TopBar`. `Ctrl+K` focuses it and `Esc`
+clears it, back to the page.
+
+- **Empty**: the current page shows.
+- **Typing**: the search page: recently played and the library, filtered. `Library` filters
+  with `filterDirs` (Fuse.js) and gets a `LIBRARY n` header.
   Below it, `OnlineSection` (with **youtube** / **twitch** tabs, `online.platform`) offers
   `search youtube for "…" ⏎` or `list twitch vods from "…" ⏎`. Nothing online is searched
   while typing, so local lookups never call yt-dlp.
@@ -96,9 +114,10 @@ There's one search box (`query` in the store), in `Header`:
   (`searchedQuery`). If the query changes afterwards, the old results stay under a
   `results for "…"` label until the next search. A newer search always wins over a slower
   older one, and switching tabs (`selectPlatform`) drops the results.
-- **Clearing** the box drops the online results (`clearOnlineSearch`).
+- **Clearing** the box (or `Esc`, or opening a page) keeps the online results, so the Explore page
+  still shows the last search; switching tabs or a new search replaces them.
 
-Above the library, `HistorySection` lists what was watched online (`online.history`): an online
+`HistorySection` (the Recently played page, and the top of Home and of search results) lists what was watched online (`online.history`): an online
 track counts once it has played for 30 s, or half of a shorter video (`useWatchHistory`, mounted
 in `MainView`; time paused, resolving, or after the stream failed doesn't count). Watching it
 again moves it to the top; the oldest drop off past 50. It's filtered by the query like the
@@ -130,6 +149,7 @@ Single store at `src/store.ts`, with state grouped by source:
 ### Root-level
 
 - `query` — the search box: filters the library, searched online (YouTube or Twitch) on Enter
+- `nav` — `{ view, back, forward }`: the page shown (persisted) and the ‹ › stacks
 - `queue` / `queueIndex` — the play queue, the single source of truth for playback;
   the current track (local or online) is derived via `selectCurrentTrack`
 - `playing` — playback state (true/false)
@@ -155,9 +175,9 @@ Single store at `src/store.ts`, with state grouped by source:
 - `online.video` — play the current online track with video (back on for every new track)
 - `online.downloads` — download status per `platform:videoId:kind` (state, percent, path/error)
 - `online.history` — watched online items (`HistoryEntry[]`), most recent first, deduplicated,
-  at most 50 (persisted); `online.historyCollapsed` folds the HISTORY section (persisted)
+  at most 50 (persisted); `online.historyCollapsed` folds the recently played section (persisted)
 - `online.failedStreams` — `platform:videoId` keys whose stream couldn't be resolved the last
-  time (a live channel that's offline now), so its HISTORY row can say so
+  time (a live channel that's offline now), so its recently played row can say so
 
 ### Selective subscriptions
 
@@ -170,17 +190,20 @@ const dirs = useAppStore((s) => s.library.dirs)
 ## Component Hierarchy
 
 App.tsx
-├── Titlebar
-├── Header ← stats, search box (Enter searches online), ThemeToggle
+├── Sidebar ← pages and local folders (navigate)
+├── TopBar ← ‹ ›, search box (Enter searches online), activity, ThemeToggle, window controls
 ├── (main row)
-│ ├── MainView ← runs the scan, durations and download-progress listeners
+│ ├── MainView ← runs the scan, durations, download-progress and history hooks
 │ │ ├── ScrollToActive
-│ │ ├── HistorySection ← HISTORY: watched online items (filtered by the query, foldable)
+│ │ └── CurrentPage (pages/Pages.tsx) ← Home / Explore / Library / Recently played / folder,
+│ │ │ or the search page while the query isn't empty, built from:
+│ │ ├── PageHeader ← page title and subtitle
+│ │ ├── HistorySection ← RECENTLY PLAYED: watched online items (filtered, foldable, `limit`)
 │ │ │ └── HistoryRow (×N) → TrackRow + TrackCover + DownloadButtons + remove
-│ │ ├── Library ← LIBRARY (filtered by the query)
+│ │ ├── Library ← folders and albums (filtered by the query; `only` for one folder)
 │ │ │ └── TrackList
 │ │ │ └── Track (×N) → TrackRow + TrackCover (lazy cover)
-│ │ └── OnlineSection ← ONLINE + youtube/twitch tabs (while the query isn't empty)
+│ │ └── OnlineSection ← ONLINE + youtube/twitch tabs (search page, or Explore with `page`)
 │ │ └── ResultRow (×N) → TrackRow + TrackCover + DownloadButtons
 │ └── VideoPane ← portal target for video element
 └── PlayerBar
@@ -402,14 +425,14 @@ localStorage and applies via `document.documentElement.dataset.theme`.
 Background gradients on `body` provide visual depth that's preserved by
 translucent panel surfaces (`bg-app-bg/80`).
 
-The title bar, header and player bar sit on their own surface, `bg-app-bar`, with a soft
+The sidebar, top bar and player bar sit on their own surface, `bg-app-bar`, with a soft
 `--color-app-bar-shadow` toward the list, so they don't blend into it: deeper than the list in the
 dark theme, lighter (raised paper) in the light theme, where a deeper cream would cost text contrast.
 
 ## Custom Window Chrome
 
 - `tauri.conf.json` — `transparent: true, decorations: false`
-- `components/TitleBar.tsx` — draws minimize/maximize/close and the drag region; the
+- `components/TopBar.tsx` — draws minimize/maximize/close and the drag region; the
   matching window permissions are in `src-tauri/capabilities/default.json`
 - `body` background uses linear gradient, panels use translucent backgrounds
 
@@ -418,20 +441,21 @@ dark theme, lighter (raised paper) in the light theme, where a deeper cream woul
 Stored in localStorage:
 
 - `playmusic-theme` — current theme
+- `playmusic-view` — the page shown (`nav.view`)
 - `playmusic-volume` — last volume setting
 - `playmusic-collapsed` — Set of collapsed album keys
 - `playmusic-playerbar-height` — last drag-resized player bar height
 - `playmusic-videopane-width` — last drag-resized video pane width
 - `playmusic-online-platform` — the selected ONLINE tab (youtube or twitch)
 - `playmusic-history` — the watch history (`online.history`)
-- `playmusic-history-collapsed` — whether the HISTORY section is folded
+- `playmusic-history-collapsed` — whether the recently played section is folded
 
 Cover thumbnails are cached in the OS app cache dir (cleared if the app is uninstalled).
 
 ## Constants & Utilities
 
 - `src/constants.ts` — `VIDEO_EXTS`, `AUDIO_EXTS`, `isVideo()`, `isAudio()`
-- `src/utils/filterDirs.ts` — fuzzy search via Fuse.js with weighted fields; `filterHistory.ts` does the same for HISTORY
+- `src/utils/filterDirs.ts` — fuzzy search via Fuse.js with weighted fields; `filterHistory.ts` does the same for recently played
 - `src/utils/trackName.ts` — `displayName()`: file name without extension or the YouTube/Twitch `[id]`
 - `src/utils/format.ts` — `formatDuration()`, `formatRelative()`
 - `src/components/TrackRow.tsx` / `TrackCover.tsx` — the one row layout and cover tile shared by

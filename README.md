@@ -13,6 +13,14 @@ terminal player, and is meant as a learning-friendly codebase (the repository is
 
 ## What it does
 
+**Layout**
+
+- A sidebar like YouTube Music's: **Home** (what you watched lately and the newest files in your
+  library), **Explore** (YouTube and Twitch), **Your library**, **Recently played**, and each
+  local folder under **Local folders**. The page you were on is reopened next time.
+- A top bar with back/forward through the pages you visited and the search box (`Ctrl+K` to
+  focus it, `Esc` to clear it and go back to the page).
+
 **Local library**
 
 - On startup, scans `~/Downloads`, `~/Music`, `~/Videos`, `~/Desktop` and `~/Documents`, up to three
@@ -22,7 +30,7 @@ terminal player, and is meant as a learning-friendly codebase (the repository is
 - Fuzzy search across file, album and folder names, as you type.
 - Collapsible albums; which ones are collapsed is remembered.
 - Duplicate detection: files with the same size and the same first and last 4 KiB are listed once
-  (the first copy found), and the header shows how many duplicates were hidden.
+  (the first copy found), and the Library page says how many duplicates were hidden.
 
 **Player**
 
@@ -45,16 +53,17 @@ terminal player, and is meant as a learning-friendly codebase (the repository is
 **YouTube and Twitch (optional)**
 
 - Press Enter in the search box to also search online; results are listed under your library's
-  matches, in an ONLINE section with **youtube** and **twitch** tabs:
+  matches, in an ONLINE section with **youtube** and **twitch** tabs (the **Explore** page keeps
+  showing the last search):
   - **youtube**: a search (top 20 results).
   - **twitch**: type a channel name to list its 20 most recent VODs (Twitch itself can't be
     searched). If the channel is live right now, its stream is listed on top with a **LIVE**
     badge and plays live (no seeking, no recording).
   - Pasting a YouTube or Twitch link opens that video (or channel) on either tab.
-- What you watch online (for 30 seconds, or half of a shorter video) is listed in a **HISTORY**
-  section at the top, most recent first (the last 50). A live channel you watched plays live again
-  from there, or shows **offline**. Fold it from its header, clear it there, or remove single rows
-  with ×.
+- What you watch online (for 30 seconds, or half of a shorter video) is listed under **Recently
+  played**, most recent first (the last 50), and the first five on Home. A live channel you
+  watched plays live again from there, or shows **offline**. Fold it from its header, clear it
+  there, or remove single rows with ×.
 - Streaming goes through [yt-dlp](https://github.com/yt-dlp/yt-dlp): video up to 1080p (Twitch:
   720p) in the video pane, or audio only with the video button in the player bar. Not needed for
   local files; see [Online search](#online-search-optional) below.

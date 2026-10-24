@@ -48,8 +48,9 @@ download and update itself (see `src-tauri/src/ytdlp.rs`). Only installers built
 
 ```
 src/
-  App.tsx            root shell: Header, MainView + VideoPane, PlayerBar
-  components/        Header (search), MainView (HistorySection + Library + OnlineSection), PlayerBar, ...
+  App.tsx            root shell: Sidebar, TopBar, MainView + VideoPane, PlayerBar
+  components/        Sidebar (pages, folders), TopBar (‹ ›, search, window controls), MainView,
+                     pages/ (Home, Explore, Library, Recently played, folder, search), PlayerBar, ...
   hooks/             useScan, useAudioPlayer, useWaveform, useDurations, useResizable, ...
   store.ts           single Zustand store
   types.ts           TS mirrors of the Rust IPC structs
@@ -93,10 +94,15 @@ src-tauri/src/
   are defined in the `@theme` block of `src/App.css`.
 - Shared state goes in the Zustand store, not React Context. It's grouped by source:
   `library.*` (local files) and `online.*` (platform tab, search results, downloads, video
-  setting, watch history), with the search box's `query` and playback state at the root.
+  setting, watch history), with the search box's `query`, the page (`nav`) and playback state at
+  the root.
 - Subscribe selectively: `useAppStore((s) => s.library.dirs)`, not the whole store.
-- There's one main view: the search box filters the library as you type and searches online
-  (YouTube, or a Twitch channel's VODs) only on Enter. Keep yt-dlp out of the per-keystroke path.
+- Pages: the sidebar calls `navigate(view)` (`nav.view`, with ‹ › stacks); a new page is a `View`
+  variant in `store.ts` plus a case in `pages/Pages.tsx`. While the search box has text, search
+  results show instead of the page. Keep one scroll element (`SCROLL_ROOT_ID` in `MainView`): the
+  lazy-cover observer is rooted on it.
+- The search box filters the library as you type and searches online (YouTube, or a Twitch
+  channel's VODs) only on Enter. Keep yt-dlp out of the per-keystroke path.
 - localStorage keys use the `playmusic-` prefix.
 - Prettier (`.prettierrc`): no semicolons, single quotes, 2-space indent, 100 columns.
 

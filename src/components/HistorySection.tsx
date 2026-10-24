@@ -11,17 +11,28 @@ import { TrackRow } from './TrackRow'
 
 /**
  * Online items that were watched (`online.history`, filled by `useWatchHistory`), most recent
- * first, at the top of the main view. Headed like a library folder and folds like an album. The
- * search box filters it like the library; it's hidden while empty.
+ * first: the Recently played page, the top of Home (`limit`, with "see all") and of search
+ * results. Headed like a library folder and folds like an album, except on its own page
+ * (`unfoldable`). The search box filters it like the library; it's hidden while empty.
  */
-export function HistorySection() {
+export function HistorySection({
+  limit,
+  unfoldable = false,
+}: {
+  limit?: number
+  /** Always open, with no fold control: the Recently played page. */
+  unfoldable?: boolean
+}) {
   const history = useAppStore((s) => s.online.history)
   const query = useAppStore((s) => s.query.trim())
-  const collapsed = useAppStore((s) => s.online.historyCollapsed)
+  const folded = useAppStore((s) => s.online.historyCollapsed)
+  const collapsed = !unfoldable && folded
   const toggleCollapsed = useAppStore((s) => s.toggleHistoryCollapsed)
   const playTrackFromList = useAppStore((s) => s.playTrackFromList)
+  const navigate = useAppStore((s) => s.navigate)
 
-  const shown = useMemo(() => filterHistory(history, query), [history, query])
+  const matching = useMemo(() => filterHistory(history, query), [history, query])
+  const shown = limit === undefined ? matching : matching.slice(0, limit)
   if (shown.length === 0) return null
 
   // A live channel plays on its own; next/previous from a video walk the other videos, so
@@ -34,21 +45,35 @@ export function HistorySection() {
   return (
     <div className="mb-2">
       <div
-        onClick={toggleCollapsed}
-        className="group/header flex items-center gap-3 px-6 mt-6 mb-2 cursor-pointer"
+        onClick={unfoldable ? undefined : toggleCollapsed}
+        className={`group/header flex items-center gap-3 px-6 mt-6 mb-2 ${
+          unfoldable ? '' : 'cursor-pointer'
+        }`}
       >
         <span className="flex items-center gap-2 text-xs font-mono text-app-accent tracking-widest uppercase shrink-0">
-          {collapsed ? (
+          {unfoldable ? null : collapsed ? (
             <ChevronRight size={12} className="text-app-muted" />
           ) : (
             <ChevronDown size={12} className="text-app-muted" />
           )}
-          history
+          recently played
         </span>
         <div className="flex-1 h-px bg-app-border" />
-        <ClearHistory />
+        {shown.length < matching.length ? (
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              navigate({ page: 'recent' })
+            }}
+            className="text-xs font-mono text-app-secondary hover:text-app-accent shrink-0 transition-colors"
+          >
+            see all
+          </button>
+        ) : (
+          <ClearHistory />
+        )}
         <span className="text-xs font-mono text-app-muted tabular-nums shrink-0">
-          {shown.length}
+          {matching.length}
         </span>
       </div>
 

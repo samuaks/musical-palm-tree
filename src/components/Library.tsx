@@ -2,12 +2,15 @@ import { ChevronDown, ChevronRight } from 'lucide-react'
 import { AlbumSkeleton } from './Skeleton'
 import { TrackList } from './TrackList'
 import { useAppStore } from '../store'
-import { useMemo } from 'react'
+import { ReactNode, useMemo } from 'react'
 import { filterDirs } from '../utils/filterDirs'
 import { SourceHeader } from './SourceHeader'
+import { Directory } from '../types'
 
-export function Library() {
-  const dirs = useAppStore((s) => s.library.dirs)
+/** The library's folders and albums, filtered by the search box. `only` limits it to some folders. */
+export function Library({ only }: { only?: Directory[] }) {
+  const allDirs = useAppStore((s) => s.library.dirs)
+  const dirs = only ?? allDirs
   const query = useAppStore((s) => s.query)
   const scanState = useAppStore((s) => s.library.scanState)
   const collapsed = useAppStore((s) => s.library.collapsed)
@@ -89,14 +92,27 @@ export function Library() {
   )
 }
 
-function SectionHeader({ name, count }: { name: string; count: number }) {
+/** Heads a top-level folder (and the Home page's lists): accent name, a rule, the count. */
+export function SectionHeader({
+  name,
+  count,
+  children,
+}: {
+  name: string
+  count?: number
+  /** Extra controls before the count (e.g. "see all"). */
+  children?: ReactNode
+}) {
   return (
     <div className="flex items-center gap-3 px-6 mt-6 mb-2">
       <span className="text-xs font-mono text-app-accent tracking-widest uppercase shrink-0">
         {name}
       </span>
       <div className="flex-1 h-px bg-app-border" />
-      <span className="text-xs font-mono text-app-muted tabular-nums shrink-0">{count}</span>
+      {children}
+      {count !== undefined && (
+        <span className="text-xs font-mono text-app-muted tabular-nums shrink-0">{count}</span>
+      )}
     </div>
   )
 }

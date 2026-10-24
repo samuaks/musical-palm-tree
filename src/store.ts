@@ -14,6 +14,17 @@ import {
 
 type Theme = 'dark' | 'light'
 
+/** A page of the main view, picked in the sidebar. A non-empty search box shows results instead. */
+export type View =
+  | { page: 'home' }
+  | { page: 'explore' }
+  | { page: 'library' }
+  | { page: 'recent' }
+  | { page: 'folder'; path: string }
+
+const VIEW_KEY = 'playmusic-view'
+/** How far back ‹ can go. */
+const NAV_HISTORY_LIMIT = 50
 const COLLAPSED_KEY = 'playmusic-collapsed'
 const ONLINE_PLATFORM_KEY = 'playmusic-online-platform'
 const HISTORY_KEY = 'playmusic-history'
@@ -53,9 +64,17 @@ interface OnlineState {
   failedStreams: Set<string>
 }
 
+interface NavState {
+  view: View // the page shown (persisted)
+  back: View[] // pages ‹ returns to, most recent last
+  forward: View[] // pages › goes to after going back
+}
+
 interface AppState {
   // one search box: filters the library as you type, searches online (YouTube/Twitch) on Enter
   query: string
+
+  nav: NavState
 
   library: LibraryState
   online: OnlineState
@@ -80,6 +99,11 @@ interface AppState {
   setVideoActive: (videoActive: boolean) => void
   setYtDlp: (status: YtDlpStatus) => void
   setTheme: (theme: Theme) => void
+
+  // navigation: opening a page clears the search box, so the page shows instead of results
+  navigate: (view: View) => void
+  goBack: () => void
+  goForward: () => void
 
   // queue actions
   playTrackFromList: (tracks: Track[], index: number) => void
@@ -119,6 +143,7 @@ export const useAppStore = create<AppState>((set) => {
 
   return {
     query: '',
+    nav: { view: loadView(), back: [], forward: [] },
     queue: [],
     queueIndex: -1,
     playing: false,
@@ -161,6 +186,41 @@ export const useAppStore = create<AppState>((set) => {
       document.documentElement.dataset.theme = theme
       set({ theme })
     },
+
+    navigate: (view) =>
+      set((s) => {
+        if (sameView(view, s.nav.view)) return s.query ? { query: '' } : s
+        saveView(view)
+        return {
+          query: '',
+          nav: {
+            view,
+            back: [...s.nav.back, s.nav.view].slice(-NAV_HISTORY_LIMIT),
+            forward: [],
+          },
+        }
+      }),
+    goBack: () =>
+      set((s) => {
+        const view = s.nav.back[s.nav.back.length - 1]
+        if (!view) return s
+        saveView(view)
+        return {
+          query: '',
+          nav: { view, back: s.nav.back.slice(0, -1), forward: [...s.nav.forward, s.nav.view] },
+        }
+      }),
+    goForward: () =>
+      set((s) => {
+        const view = s.nav.forward[s.nav.forward.length - 1]
+        if (!view) return s
+        saveView(view)
+        return {
+          query: '',
+          nav: { view, back: [...s.nav.back, s.nav.view], forward: s.nav.forward.slice(0, -1) },
+        }
+      }),
+
     playTrackFromList: (tracks, index) => {
       if (tracks.length === 0 || index < 0 || index >= tracks.length) return
       set((s) => ({ queue: tracks, queueIndex: index, online: { ...s.online, video: true } }))
@@ -263,6 +323,28 @@ export const useAppStore = create<AppState>((set) => {
 /** Store key for one online stream, for `online.failedStreams`. */
 export function streamKey(platform: Platform, videoId: string): string {
   return `${platform}:${videoId}`
+}
+
+function sameView(a: View, b: View): boolean {
+  return JSON.stringify(a) === JSON.stringify(b)
+}
+
+function saveView(view: View) {
+  localStorage.setItem(VIEW_KEY, JSON.stringify(view))
+}
+
+function loadView(): View {
+  const home: View = { page: 'home' }
+  if (typeof window === 'undefined') return home
+  try {
+    const v = JSON.parse(localStorage.getItem(VIEW_KEY) ?? 'null')
+    if (v?.page === 'folder')
+      return typeof v.path === 'string' ? { page: 'folder', path: v.path } : home
+    if (['home', 'explore', 'library', 'recent'].includes(v?.page)) return { page: v.page }
+    return home
+  } catch {
+    return home
+  }
 }
 
 function saveHistory(history: HistoryEntry[]): HistoryEntry[] {

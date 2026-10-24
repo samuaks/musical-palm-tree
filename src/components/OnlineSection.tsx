@@ -44,12 +44,13 @@ function wording(platform: Platform, query: string) {
 }
 
 /**
- * The ONLINE part of the main view, shown while the search box isn't empty. Tabs pick YouTube
+ * The ONLINE part of the search results, shown while the search box isn't empty, and the Explore
+ * page (`page`), which keeps showing the last search after the box is cleared. Tabs pick YouTube
  * (text search) or Twitch (a channel's recent VODs). Searched only on Enter (or by clicking the
  * search row), so filtering the library never calls yt-dlp.
  */
-export function OnlineSection() {
-  const query = useAppStore((s) => s.query.trim())
+export function OnlineSection({ page = false }: { page?: boolean }) {
+  const typed = useAppStore((s) => s.query.trim())
   const platform = useAppStore((s) => s.online.platform)
   const results = useAppStore((s) => s.online.results)
   const searchedQuery = useAppStore((s) => s.online.searchedQuery)
@@ -57,9 +58,13 @@ export function OnlineSection() {
   const searchError = useAppStore((s) => s.online.searchError)
   const playTrackFromList = useAppStore((s) => s.playTrackFromList)
   const ytDlp = useAppStore((s) => s.ytDlp)
+  const query = typed || (page ? (searchedQuery ?? '') : '')
 
   // Hidden only where yt-dlp is missing and the app can't install it.
-  if (!query || (ytDlp && !ytDlp.available && !ytDlp.can_install)) return null
+  if (ytDlp && !ytDlp.available && !ytDlp.can_install) {
+    return page ? <StatusRow>yt-dlp isn't available on this system.</StatusRow> : null
+  }
+  if (!query && !page) return null
 
   function handlePlay(result: OnlineSearchResult) {
     const idx = results.findIndex((r) => r.video_id === result.video_id)
@@ -93,6 +98,14 @@ export function OnlineSection() {
 
       {ytDlp && !ytDlp.available ? (
         <EnableOnline />
+      ) : !query ? (
+        // the Explore page before anything was searched
+        <StatusRow>
+          <Search size={14} className="shrink-0" />
+          {platform === 'twitch'
+            ? 'type a Twitch channel in the search box and press enter to list its vods'
+            : 'type in the search box and press enter to search youtube'}
+        </StatusRow>
       ) : (
         <>
           {searching ? (

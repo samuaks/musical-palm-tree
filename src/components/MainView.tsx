@@ -1,8 +1,6 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { listen } from '@tauri-apps/api/event'
-import { HistorySection } from './HistorySection'
-import { Library } from './Library'
-import { OnlineSection } from './OnlineSection'
+import { CurrentPage } from './pages/Pages'
 import { ScrollToActive } from './ScrollToActivate'
 import { useScan } from '../hooks/useScan'
 import { useDurations } from '../hooks/useDurations'
@@ -13,8 +11,8 @@ import { downloadKey } from '../api/online'
 import { DownloadProgress } from '../types'
 
 /**
- * The one content view: watched online items on top, the library (both filtered by the search
- * box) and, while searching, the YouTube/Twitch results under it. Scrolls as a whole.
+ * The content area: the page picked in the sidebar (`nav.view`), or search results while the
+ * search box has text. Also runs the app-wide data hooks (scan, durations, downloads, history).
  */
 export function MainView() {
   useScan()
@@ -22,13 +20,20 @@ export function MainView() {
   useDownloadProgress()
   useWatchHistory()
 
+  // One scroll element for every page (the lazy-cover observer is rooted on it), back to the
+  // top when the page or search changes
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const view = useAppStore((s) => s.nav.view)
+  const searching = useAppStore((s) => s.query.trim() !== '')
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: 0 })
+  }, [view, searching])
+
   return (
-    <div className="flex-1 relative overflow-hidden">
+    <div className="flex-1 min-w-0 relative overflow-hidden">
       <ScrollToActive />
-      <div id={SCROLL_ROOT_ID} className="overflow-y-auto h-full py-2">
-        <HistorySection />
-        <Library />
-        <OnlineSection />
+      <div ref={scrollRef} id={SCROLL_ROOT_ID} className="overflow-y-auto h-full pb-4">
+        <CurrentPage />
       </div>
     </div>
   )
