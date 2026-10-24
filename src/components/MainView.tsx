@@ -5,6 +5,7 @@ import { ScrollToActive } from './ScrollToActivate'
 import { useScan } from '../hooks/useScan'
 import { useDurations } from '../hooks/useDurations'
 import { usePlayLog } from '../hooks/usePlayLog'
+import { useTwitchLiveStatus } from '../hooks/useTwitchChannels'
 import { SCROLL_ROOT_ID } from '../hooks/useCoverArt'
 import { useAppStore } from '../store'
 import { downloadKey } from '../api/online'
@@ -19,6 +20,7 @@ export function MainView() {
   useDurations()
   useDownloadProgress()
   usePlayLog()
+  useTwitchLiveStatus()
 
   // One scroll element for every page (the lazy-cover observer is rooted on it), back to the
   // top when the page or search changes

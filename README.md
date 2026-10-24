@@ -16,8 +16,12 @@ terminal player, and is meant as a learning-friendly codebase (the repository is
 **Layout**
 
 - A sidebar like YouTube Music's: **Home**, **Explore** (YouTube and Twitch), **Your library**,
-  **Recently played**, then **Most listened** and each local folder under **Local folders**. The
-  page you were on is reopened next time.
+  **Recently played**, then **Most listened**, each local folder under **Local folders**, and the
+  Twitch channels you watch under **Channels**. The page you were on is reopened next time.
+- **Channels**: every Twitch channel you watched (live, or a VOD), most recent first, with a
+  **LIVE** dot while it's streaming (checked at startup and every 5 minutes, for up to 10
+  channels). A channel's page has its live stream on top and its recent VODs; **Explore** lists
+  them too, as chips.
 - **Home**: your **Most listened** of the last 30 days (with **play all**), what you played
   lately, and the newest files in your library.
 - Anything that plays for 30 seconds (or half of a shorter track), from your library or online,

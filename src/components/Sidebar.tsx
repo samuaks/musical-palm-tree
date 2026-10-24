@@ -9,13 +9,20 @@ import {
   History,
   House,
   Library,
+  Tv,
 } from 'lucide-react'
 import { useAppStore, View } from '../store'
 import { Directory } from '../types'
+import { useTwitchChannels } from '../hooks/useTwitchChannels'
+import { TwitchChannel } from '../utils/plays'
 
-/** Pages, then the collection (local folders), like YouTube Music's left column. */
+/**
+ * Pages, then the collection (local folders) and the Twitch channels you watch, like YouTube
+ * Music's left column.
+ */
 export function Sidebar() {
   const dirs = useAppStore((s) => s.library.dirs)
+  const channels = useTwitchChannels()
   const [foldersOpen, setFoldersOpen] = useState(true)
 
   return (
@@ -62,6 +69,18 @@ export function Sidebar() {
             ))}
           </div>
         )}
+
+        {channels.length > 0 && (
+          <>
+            <div className="h-px bg-app-border mx-2 my-4" />
+            <SectionTitle>channels</SectionTitle>
+            <div className="flex flex-col gap-0.5">
+              {channels.map((channel) => (
+                <ChannelItem key={channel.name} channel={channel} />
+              ))}
+            </div>
+          </>
+        )}
       </div>
     </nav>
   )
@@ -96,6 +115,36 @@ function NavItem({ view, icon, label }: { view: View; icon: ReactNode; label: st
     >
       {icon}
       <span className="truncate">{label}</span>
+    </button>
+  )
+}
+
+/** A Twitch channel you watched, with a dot while it's live (`useTwitchLiveStatus`). */
+function ChannelItem({ channel }: { channel: TwitchChannel }) {
+  const navigate = useAppStore((s) => s.navigate)
+  const view: View = { page: 'channel', name: channel.name }
+  const current = useIsCurrent(view)
+  const live = useAppStore((s) => s.online.liveChannels.has(channel.name))
+
+  return (
+    <button
+      onClick={() => navigate(view)}
+      aria-current={current ? 'page' : undefined}
+      title={live ? `${channel.display} is live` : channel.display}
+      className={`w-full flex items-center gap-3 px-3 py-1.5 rounded-md text-sm font-mono transition-colors ${
+        current
+          ? 'bg-app-selected text-app-accent'
+          : 'text-app-secondary hover:bg-app-hover hover:text-app-text'
+      }`}
+    >
+      <Tv size={16} className="shrink-0" />
+      <span className="flex-1 text-left truncate">{channel.display}</span>
+      {live && (
+        <span className="flex items-center gap-1.5 text-[10px] text-app-accent tracking-wider uppercase">
+          <span className="w-1.5 h-1.5 rounded-full bg-app-accent" />
+          live
+        </span>
+      )}
     </button>
   )
 }

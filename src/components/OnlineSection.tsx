@@ -162,7 +162,7 @@ function StatusRow({ children }: { children: ReactNode }) {
 }
 
 /** An online result, laid out like a library track; downloads sit before the duration. */
-function ResultRow({ result, onPlay }: { result: OnlineSearchResult; onPlay: () => void }) {
+export function ResultRow({ result, onPlay }: { result: OnlineSearchResult; onPlay: () => void }) {
   const current = useAppStore(selectCurrentTrack)
   const resolving = useAppStore((s) => s.resolving)
   const playing = useAppStore((s) => s.playing)

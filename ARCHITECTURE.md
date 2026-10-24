@@ -92,7 +92,11 @@ results. `pages/Pages.tsx` renders the view:
 - **Home**: Most listened (6 tiles, "see all", "play all"), recently played (first 5, "see all")
   and the newest library files.
 - **Most listened**: the top 50 of the last 30 days, as rows.
-- **Explore**: the YouTube/Twitch tabs and the last online search (`OnlineSection page`).
+- **Explore**: your Twitch channels as chips, then the YouTube/Twitch tabs and the last online
+  search (`OnlineSection page`).
+- **A channel** (sidebar → CHANNELS, or an Explore chip; `pages/ChannelPage.tsx`): its live stream
+  on top, if it's live, and its recent VODs: `search_online(name, 'twitch')`, kept in the page
+  (not `online.results`), reused for 2 minutes, and fetched once even if two requests overlap.
 - **Your library**: scan stats and the whole library. **A folder** (sidebar → Local folders):
   just that folder (`Library only`).
 - **Recently played**: the play log, library files and online items mixed.
@@ -196,6 +200,7 @@ Single store at `src/store.ts`, with state grouped by source:
 - `online.downloads` — download status per `platform:videoId:kind` (state, percent, path/error)
 - `online.failedStreams` — `platform:videoId` keys whose stream couldn't be resolved the last
   time (a live channel that's offline now), so its recently played row can say so
+- `online.liveChannels` — Twitch channels (login names) the last live check found live
 
 ### Selective subscriptions
 
@@ -235,7 +240,7 @@ lib.rs ← entry, registers commands, runs Tauri
 scanner.rs ← scan_media command, walks filesystem with rayon
 art.rs ← cover_art command, embedded/folder cover thumbnails on demand
 waveform.rs ← generate_waveform command, decodes via symphonia
-online.rs ← search_online / resolve_stream commands
+online.rs ← search_online / resolve_stream / fetch_live_playlist / twitch_live_status commands
 ytdlp.rs ← yt_dlp_status / install_yt_dlp, finds/updates/runs yt-dlp
 
 ### Tauri Commands
@@ -248,6 +253,7 @@ ytdlp.rs ← yt_dlp_status / install_yt_dlp, finds/updates/runs yt-dlp
 | `search_online`     | YouTube search / Twitch channel VODs / link | async      |
 | `resolve_stream`    | yt-dlp lookup of audio (+ video) URLs      | async      |
 | `fetch_live_playlist` | Twitch live playlist for hls.js (no Origin) | async     |
+| `twitch_live_status` | Whether each channel is live (first 10, in parallel) | async |
 | `download_media`    | Download audio/video into the library      | async      |
 | `yt_dlp_status`     | yt-dlp found / installable, ffmpeg found   | sync       |
 | `install_yt_dlp`    | Download + verify yt-dlp into app data dir | async      |
@@ -340,6 +346,11 @@ stream, it returns sound only.
   (`LiveIndicator`); the `←→ seek` hint is hidden and seeking does nothing. Toggling video or recovering
   from an error restarts at the live edge. hls.js fatal errors use the same re-resolve-and-retry
   path as expired URLs.
+- **Channels in the sidebar**: the Twitch channels in the play log (`twitchChannels` in
+  `utils/plays.ts`: `live:<channel>` entries and VOD uploaders, most recent first, 10 at most).
+  `useTwitchLiveStatus` (mounted in `MainView`) asks `twitch_live_status` at startup, every 5
+  minutes, and when the set of channels changes; it runs the same yt-dlp live check as the channel
+  listing, one per channel in parallel, and the result is `online.liveChannels` (the LIVE dots).
 
 - The sound plays in the `<audio>` element, which stays the master: play, pause, seek, volume,
   `timeupdate` and `ended` all go through it, as for any audio track.
@@ -421,6 +432,7 @@ runs without it (local-only). `ytdlp.rs` owns finding, installing, updating and 
 | `useDurations`   | Lazily fills track durations via `<audio>` metadata          |
 | `useAudioPlayer` | Audio/video playback, seek, keyboard shortcuts, stream resolve |
 | `usePlayLog`     | Adds the current track (local or online) to `plays` after 30 s of playback |
+| `useTwitchChannels` / `useTwitchLiveStatus` | The play log's Twitch channels; their live dots every 5 min |
 | `useLibraryIndex` | Every library file by path, with its folder and album       |
 | `useVideoSync`   | Keeps an online track's muted video in step with its audio   |
 | `useVolume`      | Volume state with localStorage persistence + mute toggle     |

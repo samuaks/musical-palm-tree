@@ -71,7 +71,8 @@ src-tauri/src/
   mirrors live in `src/types.ts`. **Change both sides together.** (`scanner.rs` has a test
   pinning `MediaFile`'s field names.)
 - Commands: `scan_media`, `generate_waveform`, `cover_art`, `search_online`,
-  `resolve_stream`, `fetch_live_playlist`, `download_media`, `yt_dlp_status`, `install_yt_dlp`. New commands must be added to `generate_handler!` in
+  `resolve_stream`, `fetch_live_playlist`, `twitch_live_status`, `download_media`, `yt_dlp_status`,
+  `install_yt_dlp`. New commands must be added to `generate_handler!` in
   `lib.rs`. Window permissions live in `src-tauri/capabilities/default.json`; Rust-side
   process spawning (`tauri-plugin-shell`'s `command()`) isn't scoped by capabilities.
 - Run yt-dlp only through `ytdlp::run` (or `ytdlp::run_streaming` for line-by-line output),
