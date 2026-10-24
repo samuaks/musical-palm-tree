@@ -121,7 +121,7 @@ function RecentPage() {
           nothing yet: videos and streams show up here after 30 seconds of playback.
         </div>
       ) : (
-        <HistorySection />
+        <HistorySection unfoldable />
       )}
     </>
   )

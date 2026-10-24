@@ -2,7 +2,7 @@ import { ReactNode, useEffect, useRef } from 'react'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { ChevronLeft, ChevronRight, Minus, Search, Square, X } from 'lucide-react'
 import { useAppStore } from '../store'
-import { clearOnlineSearch, searchOnlineNow } from '../api/online'
+import { searchOnlineNow } from '../api/online'
 import { ThemeToggle } from './ThemeToggle'
 
 const win = getCurrentWindow()
@@ -57,7 +57,7 @@ export function TopBar() {
         <button
           onClick={() => win.close()}
           aria-label="Close"
-          className="px-4 hover:bg-red-500 hover:text-white transition-colors text-app-muted flex items-center justify-center"
+          className="px-4 hover:bg-app-danger hover:text-app-danger-text transition-colors text-app-muted flex items-center justify-center"
         >
           <X size={12} />
         </button>
@@ -86,9 +86,9 @@ function SearchBox() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
 
+  // Clearing the box keeps the online results: the Explore page still shows the last search
   function changeQuery(value: string) {
     setQuery(value)
-    if (!value.trim()) clearOnlineSearch()
   }
 
   return (

@@ -29,6 +29,10 @@
   --color-app-border: rgba(255, 255, 255, 0.1);
   --color-app-skeleton: rgba(255, 255, 255, 0.1);
   --color-app-waveform: #475569;
+
+  /* the window's close button: the system red in both themes */
+  --color-app-danger: #e81123;
+  --color-app-danger-text: #ffffff;
 }
 [data-theme='light'] {
   /* surfaces — warm cream paper rather than white, easier on the eyes */

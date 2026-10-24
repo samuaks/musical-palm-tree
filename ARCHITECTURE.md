@@ -114,7 +114,8 @@ clears it, back to the page.
   (`searchedQuery`). If the query changes afterwards, the old results stay under a
   `results for "…"` label until the next search. A newer search always wins over a slower
   older one, and switching tabs (`selectPlatform`) drops the results.
-- **Clearing** the box drops the online results (`clearOnlineSearch`).
+- **Clearing** the box (or `Esc`, or opening a page) keeps the online results, so the Explore page
+  still shows the last search; switching tabs or a new search replaces them.
 
 `HistorySection` (the Recently played page, and the top of Home and of search results) lists what was watched online (`online.history`): an online
 track counts once it has played for 30 s, or half of a shorter video (`useWatchHistory`, mounted

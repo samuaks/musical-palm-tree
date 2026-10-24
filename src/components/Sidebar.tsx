@@ -19,7 +19,10 @@ export function Sidebar() {
 
   return (
     <nav className="w-60 shrink-0 flex flex-col bg-app-bar border-r border-app-border select-none">
-      <div className="flex items-center gap-2.5 px-5 h-14 shrink-0 font-mono font-bold text-app-accent">
+      <div
+        data-tauri-drag-region
+        className="flex items-center gap-2.5 px-5 h-14 shrink-0 font-mono font-bold text-app-accent"
+      >
         <div className="w-4 h-4 rounded-full border-2 border-app-accent flex items-center justify-center">
           <div className="w-1 h-1 rounded-full bg-app-accent" />
         </div>
