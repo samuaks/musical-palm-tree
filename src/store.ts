@@ -9,8 +9,13 @@ import {
   YtDlpStatus,
   DownloadStatus,
   Platform,
-  HistoryEntry,
+  LocalPlay,
+  OnlinePlay,
+  PlayEntry,
 } from './types'
+import { migrateHistory, playKey, streamKey, validPlays, withPlay } from './utils/plays'
+
+export { streamKey }
 
 type Theme = 'dark' | 'light'
 
@@ -20,6 +25,7 @@ export type View =
   | { page: 'explore' }
   | { page: 'library' }
   | { page: 'recent' }
+  | { page: 'most' }
   | { page: 'folder'; path: string }
 
 const VIEW_KEY = 'playmusic-view'
@@ -27,10 +33,11 @@ const VIEW_KEY = 'playmusic-view'
 const NAV_HISTORY_LIMIT = 50
 const COLLAPSED_KEY = 'playmusic-collapsed'
 const ONLINE_PLATFORM_KEY = 'playmusic-online-platform'
-const HISTORY_KEY = 'playmusic-history'
-const HISTORY_COLLAPSED_KEY = 'playmusic-history-collapsed'
-/** Oldest entries drop off past this. */
-export const HISTORY_LIMIT = 50
+const PLAYS_KEY = 'playmusic-plays'
+const RECENT_COLLAPSED_KEY = 'playmusic-recent-collapsed'
+/** The online-only watch history, migrated into the play log once; cleared at startup. */
+const LEGACY_HISTORY_KEY = 'playmusic-history'
+const LEGACY_HISTORY_COLLAPSED_KEY = 'playmusic-history-collapsed'
 /** From when the app had separate Local/Online spaces; cleared at startup. */
 const LEGACY_ACTIVE_SPACE_KEY = 'playmusic-active-space'
 /** From when audio-only was a saved setting instead of per track; cleared at startup. */
@@ -57,8 +64,6 @@ interface OnlineState {
   searchError: string | null
   video: boolean // play the current online track with picture (back on for every new track)
   downloads: Record<string, DownloadStatus> // keyed by downloadKey(platform, videoId, kind)
-  history: HistoryEntry[] // watched online items, most recent first (persisted)
-  historyCollapsed: boolean // the HISTORY section is folded (persisted)
   // streams that couldn't be resolved the last time they were played (a live channel that's
   // offline), keyed by streamKey(platform, videoId)
   failedStreams: Set<string>
@@ -75,6 +80,10 @@ interface AppState {
   query: string
 
   nav: NavState
+
+  // what was played for 30 s (local and online), most recent first (persisted)
+  plays: PlayEntry[]
+  recentCollapsed: boolean // the RECENTLY PLAYED section is folded (persisted)
 
   library: LibraryState
   online: OnlineState
@@ -105,6 +114,12 @@ interface AppState {
   goBack: () => void
   goForward: () => void
 
+  // play log actions
+  recordPlay: (ref: LocalPlay | OnlinePlay) => void
+  removePlay: (key: string) => void
+  clearPlays: () => void
+  toggleRecentCollapsed: () => void
+
   // queue actions
   playTrackFromList: (tracks: Track[], index: number) => void
   playNext: () => void
@@ -128,10 +143,6 @@ interface AppState {
   setOnlinePlatform: (platform: Platform) => void
   setDownload: (key: string, status: DownloadStatus) => void
   setDownloadPercent: (key: string, percent: number | null) => void
-  addToHistory: (entry: HistoryEntry) => void
-  removeFromHistory: (platform: Platform, videoId: string) => void
-  clearHistory: () => void
-  toggleHistoryCollapsed: () => void
   setStreamFailed: (platform: Platform, videoId: string, failed: boolean) => void
 }
 
@@ -144,6 +155,8 @@ export const useAppStore = create<AppState>((set) => {
   return {
     query: '',
     nav: { view: loadView(), back: [], forward: [] },
+    plays: loadPlays(),
+    recentCollapsed: loadRecentCollapsed(),
     queue: [],
     queueIndex: -1,
     playing: false,
@@ -170,9 +183,6 @@ export const useAppStore = create<AppState>((set) => {
       searchError: null,
       video: true,
       downloads: {},
-      history: loadHistory(),
-      historyCollapsed:
-        typeof window !== 'undefined' && localStorage.getItem(HISTORY_COLLAPSED_KEY) === 'true',
       failedStreams: new Set(),
     },
 
@@ -219,6 +229,17 @@ export const useAppStore = create<AppState>((set) => {
           query: '',
           nav: { view, back: [...s.nav.back, s.nav.view], forward: s.nav.forward.slice(0, -1) },
         }
+      }),
+
+    // Playing something again moves it to the top.
+    recordPlay: (ref) => set((s) => ({ plays: savePlays(withPlay(s.plays, ref, Date.now())) })),
+    removePlay: (key) =>
+      set((s) => ({ plays: savePlays(s.plays.filter((e) => playKey(e) !== key)) })),
+    clearPlays: () => set({ plays: savePlays([]) }),
+    toggleRecentCollapsed: () =>
+      set((s) => {
+        localStorage.setItem(RECENT_COLLAPSED_KEY, String(!s.recentCollapsed))
+        return { recentCollapsed: !s.recentCollapsed }
       }),
 
     playTrackFromList: (tracks, index) => {
@@ -287,27 +308,6 @@ export const useAppStore = create<AppState>((set) => {
         return { downloads: { ...s.online.downloads, [key]: { ...current, percent } } }
       }),
 
-    // Watching something again moves it to the top.
-    addToHistory: (entry) =>
-      setOnline((s) => {
-        const rest = s.online.history.filter(
-          (e) => e.platform !== entry.platform || e.video_id !== entry.video_id
-        )
-        return { history: saveHistory([entry, ...rest].slice(0, HISTORY_LIMIT)) }
-      }),
-    removeFromHistory: (platform, videoId) =>
-      setOnline((s) => ({
-        history: saveHistory(
-          s.online.history.filter((e) => e.platform !== platform || e.video_id !== videoId)
-        ),
-      })),
-    clearHistory: () => setOnline(() => ({ history: saveHistory([]) })),
-    toggleHistoryCollapsed: () =>
-      setOnline((s) => {
-        const historyCollapsed = !s.online.historyCollapsed
-        localStorage.setItem(HISTORY_COLLAPSED_KEY, String(historyCollapsed))
-        return { historyCollapsed }
-      }),
     setStreamFailed: (platform, videoId, failed) =>
       setOnline((s) => {
         const key = streamKey(platform, videoId)
@@ -319,11 +319,6 @@ export const useAppStore = create<AppState>((set) => {
       }),
   }
 })
-
-/** Store key for one online stream, for `online.failedStreams`. */
-export function streamKey(platform: Platform, videoId: string): string {
-  return `${platform}:${videoId}`
-}
 
 function sameView(a: View, b: View): boolean {
   return JSON.stringify(a) === JSON.stringify(b)
@@ -340,32 +335,39 @@ function loadView(): View {
     const v = JSON.parse(localStorage.getItem(VIEW_KEY) ?? 'null')
     if (v?.page === 'folder')
       return typeof v.path === 'string' ? { page: 'folder', path: v.path } : home
-    if (['home', 'explore', 'library', 'recent'].includes(v?.page)) return { page: v.page }
+    if (['home', 'explore', 'library', 'recent', 'most'].includes(v?.page)) return { page: v.page }
     return home
   } catch {
     return home
   }
 }
 
-function saveHistory(history: HistoryEntry[]): HistoryEntry[] {
-  localStorage.setItem(HISTORY_KEY, JSON.stringify(history))
-  return history
+function savePlays(plays: PlayEntry[]): PlayEntry[] {
+  localStorage.setItem(PLAYS_KEY, JSON.stringify(plays))
+  return plays
 }
 
-function loadHistory(): HistoryEntry[] {
+/** The play log, or, the first time, the old watch history turned into one. */
+function loadPlays(): PlayEntry[] {
   if (typeof window === 'undefined') return []
   try {
-    const parsed = JSON.parse(localStorage.getItem(HISTORY_KEY) ?? '[]')
-    if (!Array.isArray(parsed)) return []
-    return parsed.filter(
-      (e): e is HistoryEntry =>
-        (e?.platform === 'youtube' || e?.platform === 'twitch') &&
-        typeof e.video_id === 'string' &&
-        typeof e.title === 'string'
-    )
+    const saved = localStorage.getItem(PLAYS_KEY)
+    if (saved !== null) return validPlays(JSON.parse(saved))
+    const legacy = localStorage.getItem(LEGACY_HISTORY_KEY)
+    return legacy === null ? [] : savePlays(migrateHistory(JSON.parse(legacy)))
   } catch {
     return []
   }
+}
+
+function loadRecentCollapsed(): boolean {
+  if (typeof window === 'undefined') return false
+  let saved = localStorage.getItem(RECENT_COLLAPSED_KEY)
+  if (saved === null) {
+    saved = localStorage.getItem(LEGACY_HISTORY_COLLAPSED_KEY)
+    if (saved !== null) localStorage.setItem(RECENT_COLLAPSED_KEY, saved)
+  }
+  return saved === 'true'
 }
 
 function loadCollapsed(): Set<string> {
@@ -385,6 +387,9 @@ if (typeof window !== 'undefined') {
   document.documentElement.dataset.theme = initial
   localStorage.removeItem(LEGACY_ACTIVE_SPACE_KEY)
   localStorage.removeItem(LEGACY_ONLINE_VIDEO_KEY)
+  // the store above has loaded (and migrated) them by now
+  localStorage.removeItem(LEGACY_HISTORY_KEY)
+  localStorage.removeItem(LEGACY_HISTORY_COLLAPSED_KEY)
 }
 
 export const selectCurrentTrack = (s: ReturnType<typeof useAppStore.getState>): Track | null => {

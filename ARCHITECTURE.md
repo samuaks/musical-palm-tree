@@ -89,11 +89,13 @@ forward stacks. `navigate(view)` (the sidebar) pushes the current page onto `bac
 the top bar walk the stacks. Opening a page clears the search box, so the page shows instead of
 results. `pages/Pages.tsx` renders the view:
 
-- **Home**: recently played (first 5, "see all") and the newest library files.
+- **Home**: Most listened (6 tiles, "see all", "play all"), recently played (first 5, "see all")
+  and the newest library files.
+- **Most listened**: the top 50 of the last 30 days, as rows.
 - **Explore**: the YouTube/Twitch tabs and the last online search (`OnlineSection page`).
 - **Your library**: scan stats and the whole library. **A folder** (sidebar → Local folders):
   just that folder (`Library only`).
-- **Recently played**: the watch history.
+- **Recently played**: the play log, library files and online items mixed.
 
 `MainView` keeps one scroll element for every page (`SCROLL_ROOT_ID`, which the lazy-cover
 observer is rooted on) and scrolls it back to the top when the page or the search changes.
@@ -117,15 +119,6 @@ clears it, back to the page.
 - **Clearing** the box (or `Esc`, or opening a page) keeps the online results, so the Explore page
   still shows the last search; switching tabs or a new search replaces them.
 
-`HistorySection` (the Recently played page, and the top of Home and of search results) lists what was watched online (`online.history`): an online
-track counts once it has played for 30 s, or half of a shorter video (`useWatchHistory`, mounted
-in `MainView`; time paused, resolving, or after the stream failed doesn't count). Watching it
-again moves it to the top; the oldest drop off past 50. It's filtered by the query like the
-library (`filterHistory`), folds like an album, and its rows play like online results (a video
-queues the other videos; a live channel plays alone). A live stream is kept as its channel (`live:<channel>`): playing it again watches the channel live now, and if
-that fails (`online.failedStreams`, set in `useAudioPlayer`) the row says **offline**. The header
-has a **clear** control (click twice), and each row an × to remove it.
-
 What a query means is decided in Rust (`classify` in `online.rs`):
 - a pasted YouTube link (`watch`, `shorts`, `youtu.be`, music.youtube) or Twitch VOD link
   (`twitch.tv/videos/<id>`) → that one video, on either tab
@@ -142,6 +135,31 @@ order, or the online results).
 Until yt-dlp is installed, the ONLINE section shows the install panel instead of results; it's
 hidden entirely on platforms where the app can't install yt-dlp.
 
+## Play log, Recently played and Most listened
+
+`plays` in the store is the play log (`PlayEntry[]`, persisted as `playmusic-plays`): anything that
+played for 30 s, or half of a shorter track (`usePlayLog`, mounted in `MainView`; time paused,
+resolving, or after the stream failed doesn't count). A library file is kept by its path, an online
+item with what's needed to list and replay it. Playing something again moves it to the top and adds
+the time to its `recent` plays, which keep only the last 30 days; the log keeps the newest 500. The
+pure parts (`withPlay`, `mostListened`, `filterPlays`, the migration) are in `src/utils/plays.ts`.
+The old online-only `playmusic-history` is migrated into it once (each entry played once, at its
+`watched_at`) and then removed.
+
+`RecentlyPlayed` (`PlayLog.tsx`: the Recently played page, and the top of Home and of search results)
+lists the log, most recent first; library files that left the library are skipped. It's filtered by
+the query like the library, folds like an album (`recentCollapsed`), and a row plays with the other
+rows as the queue: library rows through `Track` (`onPlay`, "played 2h ago"), online rows like online
+results. A live channel plays alone, and the queue from anything else leaves live channels out, so
+playback never runs into one by itself. A live stream is kept as its channel (`live:<channel>`):
+playing it again watches the channel live now, and if that fails (`online.failedStreams`, set in
+`useAudioPlayer`) the row says **offline**. The header has a **clear** control (click twice), and
+each row an × to remove it.
+
+**Most listened** ranks the log by plays in the last 30 days (ties: played last first) and leaves
+live channels out (they're channels, not tracks). Home shows the top 6 as tiles with **play all**;
+the Most listened page lists 50. Play counts are never shown.
+
 ## State Architecture (Zustand)
 
 Single store at `src/store.ts`, with state grouped by source:
@@ -150,6 +168,8 @@ Single store at `src/store.ts`, with state grouped by source:
 
 - `query` — the search box: filters the library, searched online (YouTube or Twitch) on Enter
 - `nav` — `{ view, back, forward }`: the page shown (persisted) and the ‹ › stacks
+- `plays` — the play log (`PlayEntry[]`), most recent first, at most 500 (persisted);
+  `recentCollapsed` folds the recently played section (persisted)
 - `queue` / `queueIndex` — the play queue, the single source of truth for playback;
   the current track (local or online) is derived via `selectCurrentTrack`
 - `playing` — playback state (true/false)
@@ -174,8 +194,6 @@ Single store at `src/store.ts`, with state grouped by source:
 - `online.results` / `searchedQuery` / `searchState` / `searchError` — the last search
 - `online.video` — play the current online track with video (back on for every new track)
 - `online.downloads` — download status per `platform:videoId:kind` (state, percent, path/error)
-- `online.history` — watched online items (`HistoryEntry[]`), most recent first, deduplicated,
-  at most 50 (persisted); `online.historyCollapsed` folds the recently played section (persisted)
 - `online.failedStreams` — `platform:videoId` keys whose stream couldn't be resolved the last
   time (a live channel that's offline now), so its recently played row can say so
 
@@ -193,13 +211,14 @@ App.tsx
 ├── Sidebar ← pages and local folders (navigate)
 ├── TopBar ← ‹ ›, search box (Enter searches online), activity, ThemeToggle, window controls
 ├── (main row)
-│ ├── MainView ← runs the scan, durations, download-progress and history hooks
+│ ├── MainView ← runs the scan, durations, download-progress and play-log hooks
 │ │ ├── ScrollToActive
-│ │ └── CurrentPage (pages/Pages.tsx) ← Home / Explore / Library / Recently played / folder,
-│ │ │ or the search page while the query isn't empty, built from:
+│ │ └── CurrentPage (pages/Pages.tsx) ← Home / Explore / Library / Recently played / Most
+│ │ │ listened / folder, or the search page while the query isn't empty, built from:
 │ │ ├── PageHeader ← page title and subtitle
-│ │ ├── HistorySection ← RECENTLY PLAYED: watched online items (filtered, foldable, `limit`)
-│ │ │ └── HistoryRow (×N) → TrackRow + TrackCover + DownloadButtons + remove
+│ │ ├── MostListenedTiles / MostListenedList (PlayLog.tsx) ← top of the last 30 days
+│ │ ├── RecentlyPlayed (PlayLog.tsx) ← RECENTLY PLAYED (filtered, foldable, `limit`)
+│ │ │ └── PlayList → Track (library) / OnlinePlayRow (online) + remove
 │ │ ├── Library ← folders and albums (filtered by the query; `only` for one folder)
 │ │ │ └── TrackList
 │ │ │ └── Track (×N) → TrackRow + TrackCover (lazy cover)
@@ -401,7 +420,8 @@ runs without it (local-only). `ytdlp.rs` owns finding, installing, updating and 
 | `useScan`        | Mounts scan listeners, runs the first `scanLibrary()`        |
 | `useDurations`   | Lazily fills track durations via `<audio>` metadata          |
 | `useAudioPlayer` | Audio/video playback, seek, keyboard shortcuts, stream resolve |
-| `useWatchHistory` | Adds an online track to `online.history` after 30 s of playback |
+| `usePlayLog`     | Adds the current track (local or online) to `plays` after 30 s of playback |
+| `useLibraryIndex` | Every library file by path, with its folder and album       |
 | `useVideoSync`   | Keeps an online track's muted video in step with its audio   |
 | `useVolume`      | Volume state with localStorage persistence + mute toggle     |
 | `useWaveform`    | Invokes Rust `generate_waveform`, manages loading state      |
@@ -447,15 +467,17 @@ Stored in localStorage:
 - `playmusic-playerbar-height` — last drag-resized player bar height
 - `playmusic-videopane-width` — last drag-resized video pane width
 - `playmusic-online-platform` — the selected ONLINE tab (youtube or twitch)
-- `playmusic-history` — the watch history (`online.history`)
-- `playmusic-history-collapsed` — whether the recently played section is folded
+- `playmusic-plays` — the play log (`plays`)
+- `playmusic-recent-collapsed` — whether the recently played section is folded
+- (`playmusic-history` / `playmusic-history-collapsed`, from the old watch history, are migrated
+  into those and removed at startup)
 
 Cover thumbnails are cached in the OS app cache dir (cleared if the app is uninstalled).
 
 ## Constants & Utilities
 
 - `src/constants.ts` — `VIDEO_EXTS`, `AUDIO_EXTS`, `isVideo()`, `isAudio()`
-- `src/utils/filterDirs.ts` — fuzzy search via Fuse.js with weighted fields; `filterHistory.ts` does the same for recently played
+- `src/utils/filterDirs.ts` — fuzzy search via Fuse.js with weighted fields; `plays.ts` does the same for the play log (`filterPlays`), and ranks Most listened
 - `src/utils/trackName.ts` — `displayName()`: file name without extension or the YouTube/Twitch `[id]`
 - `src/utils/format.ts` — `formatDuration()`, `formatRelative()`
 - `src/components/TrackRow.tsx` / `TrackCover.tsx` — the one row layout and cover tile shared by

@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { useAppStore } from '../../store'
 import { MediaFile } from '../../types'
-import { HistorySection } from '../HistorySection'
+import { MostListenedList, MostListenedTiles, RecentlyPlayed } from '../PlayLog'
 import { Library, SectionHeader } from '../Library'
 import { OnlineSection } from '../OnlineSection'
 import { Track } from '../Track'
@@ -25,6 +25,8 @@ export function CurrentPage() {
       return <LibraryPage />
     case 'recent':
       return <RecentPage />
+    case 'most':
+      return <MostPage />
     case 'folder':
       return <FolderPage path={view.path} />
   }
@@ -34,7 +36,7 @@ export function CurrentPage() {
 function SearchPage() {
   return (
     <>
-      <HistorySection />
+      <RecentlyPlayed />
       <Library />
       <OnlineSection />
     </>
@@ -48,7 +50,8 @@ function HomePage() {
         title="Your music, on repeat."
         subtitle="Your files and what you watched, all in one place."
       />
-      <HistorySection limit={5} />
+      <MostListenedTiles />
+      <RecentlyPlayed limit={5} />
       <RecentlyAdded />
     </>
   )
@@ -112,17 +115,22 @@ function LibraryPage() {
 }
 
 function RecentPage() {
-  const empty = useAppStore((s) => s.online.history.length === 0)
   return (
     <>
-      <PageHeader title="Recently played" subtitle="What you watched on YouTube and Twitch." />
-      {empty ? (
-        <div className="px-6 py-3 text-xs text-app-muted font-mono">
-          nothing yet: videos and streams show up here after 30 seconds of playback.
-        </div>
-      ) : (
-        <HistorySection unfoldable />
-      )}
+      <PageHeader
+        title="Recently played"
+        subtitle="Your files, YouTube videos and Twitch streams, most recent first."
+      />
+      <RecentlyPlayed unfoldable />
+    </>
+  )
+}
+
+function MostPage() {
+  return (
+    <>
+      <PageHeader title="Most listened" subtitle="What you played most in the last 30 days." />
+      <MostListenedList />
     </>
   )
 }
