@@ -120,15 +120,20 @@ export function isChannelName(name: string): boolean {
 
 /**
  * The Twitch channels in the play log, most recently played first: channels watched live
- * (`live:<channel>`) and the channels of watched VODs.
+ * (`live:<channel>`) and the channels of watched VODs. `keep` picks which (e.g. not hidden).
  */
-export function twitchChannels(log: PlayEntry[], limit: number): TwitchChannel[] {
+export function twitchChannels(
+  log: PlayEntry[],
+  limit: number,
+  keep: (name: string) => boolean = () => true
+): TwitchChannel[] {
   const seen = new Map<string, TwitchChannel>()
   for (const e of log) {
     if (e.source !== 'online' || e.platform !== 'twitch') continue
     const login = e.live ? e.video_id.slice('live:'.length) : e.uploader
     if (!login || !isChannelName(login)) continue
     const name = login.toLowerCase()
+    if (!keep(name)) continue
     if (!seen.has(name)) seen.set(name, { name, display: e.uploader ?? login })
     if (seen.size === limit) break
   }

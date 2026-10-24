@@ -21,8 +21,10 @@ terminal player, and is meant as a learning-friendly codebase (the repository is
 - **Channels**: every Twitch channel you watched (live, or a VOD), most recent first, with a
   **LIVE** dot while it's streaming (checked at startup and every 5 minutes, for up to 10
   channels). A channel's page has its live stream on top and its recent VODs; **Explore** lists
-  them too, as chips.
-- **Home**: your **Most listened** of the last 30 days (with **play all**), what you played
+  them too, as chips. Hide a channel with its × (on Home or in the sidebar): it's gone from Home,
+  the sidebar and the live checks until you bring it back from **Explore** (the setting is saved).
+- **Home**: **Live now** (your channels streaming right now, as previews that play the stream,
+  with a refresh), your **Most listened** of the last 30 days (with **play all**), what you played
   lately, and the newest files in your library.
 - Anything that plays for 30 seconds (or half of a shorter track), from your library or online,
   counts as played: it's listed under **Recently played** (most recent first; fold it, clear it

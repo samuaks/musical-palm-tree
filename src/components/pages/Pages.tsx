@@ -7,8 +7,9 @@ import { OnlineSection } from '../OnlineSection'
 import { Track } from '../Track'
 import { PageHeader } from './PageHeader'
 import { ChannelPage } from './ChannelPage'
-import { Tv } from 'lucide-react'
-import { useTwitchChannels } from '../../hooks/useTwitchChannels'
+import { Eye, Tv } from 'lucide-react'
+import { useHiddenChannels, useTwitchChannels } from '../../hooks/useTwitchChannels'
+import { LiveNow } from '../LiveNow'
 
 /** How many of the newest library files Home lists. */
 const RECENTLY_ADDED = 8
@@ -56,6 +57,7 @@ function HomePage() {
         title="Your music, on repeat."
         subtitle="Your files and what you watched, all in one place."
       />
+      <LiveNow />
       <MostListenedTiles />
       <RecentlyPlayed limit={5} />
       <RecentlyAdded />
@@ -99,12 +101,17 @@ function ExplorePage() {
   )
 }
 
-/** The Twitch channels you watch, as chips that open their pages; a dot while live. */
+/**
+ * The Twitch channels you watch, as chips that open their pages (a dot while live), and the ones
+ * you hid, to bring back.
+ */
 function YourChannels() {
   const channels = useTwitchChannels()
-  const liveChannels = useAppStore((s) => s.online.liveChannels)
+  const hidden = useHiddenChannels()
+  const liveStreams = useAppStore((s) => s.online.liveStreams)
   const navigate = useAppStore((s) => s.navigate)
-  if (channels.length === 0) return null
+  const unhideChannel = useAppStore((s) => s.unhideChannel)
+  if (channels.length === 0 && hidden.length === 0) return null
 
   return (
     <div className="mb-2">
@@ -118,7 +125,7 @@ function YourChannels() {
           >
             <Tv size={12} />
             {c.display}
-            {liveChannels.has(c.name) && (
+            {liveStreams.has(c.name) && (
               <span className="flex items-center gap-1 text-[10px] text-app-accent tracking-wider uppercase">
                 <span className="w-1.5 h-1.5 rounded-full bg-app-accent" />
                 live
@@ -127,6 +134,24 @@ function YourChannels() {
           </button>
         ))}
       </div>
+      {hidden.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 px-6 mt-3">
+          <span className="text-[10px] font-mono text-app-muted tracking-widest uppercase">
+            hidden
+          </span>
+          {hidden.map((c) => (
+            <button
+              key={c.name}
+              onClick={() => unhideChannel(c.name)}
+              title={`show ${c.display} again on Home and in the sidebar`}
+              className="flex items-center gap-2 px-3 py-1 rounded-full border border-dashed border-app-border text-xs font-mono text-app-muted hover:border-app-accent hover:text-app-text transition-colors"
+            >
+              <Eye size={12} />
+              {c.display}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

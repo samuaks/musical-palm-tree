@@ -10,6 +10,7 @@ import {
   House,
   Library,
   Tv,
+  X,
 } from 'lucide-react'
 import { useAppStore, View } from '../store'
 import { Directory } from '../types'
@@ -119,33 +120,49 @@ function NavItem({ view, icon, label }: { view: View; icon: ReactNode; label: st
   )
 }
 
-/** A Twitch channel you watched, with a dot while it's live (`useTwitchLiveStatus`). */
+/**
+ * A Twitch channel you watched, with a dot while it's live (`useTwitchLiveStatus`); × on hover
+ * hides it everywhere (Explore brings it back).
+ */
 function ChannelItem({ channel }: { channel: TwitchChannel }) {
   const navigate = useAppStore((s) => s.navigate)
+  const hideChannel = useAppStore((s) => s.hideChannel)
   const view: View = { page: 'channel', name: channel.name }
   const current = useIsCurrent(view)
-  const live = useAppStore((s) => s.online.liveChannels.has(channel.name))
+  const live = useAppStore((s) => s.online.liveStreams.has(channel.name))
 
   return (
-    <button
-      onClick={() => navigate(view)}
-      aria-current={current ? 'page' : undefined}
-      title={live ? `${channel.display} is live` : channel.display}
-      className={`w-full flex items-center gap-3 px-3 py-1.5 rounded-md text-sm font-mono transition-colors ${
-        current
-          ? 'bg-app-selected text-app-accent'
-          : 'text-app-secondary hover:bg-app-hover hover:text-app-text'
+    <div
+      className={`group flex items-center rounded-md transition-colors ${
+        current ? 'bg-app-selected' : 'hover:bg-app-hover'
       }`}
     >
-      <Tv size={16} className="shrink-0" />
-      <span className="flex-1 text-left truncate">{channel.display}</span>
-      {live && (
-        <span className="flex items-center gap-1.5 text-[10px] text-app-accent tracking-wider uppercase">
-          <span className="w-1.5 h-1.5 rounded-full bg-app-accent" />
-          live
-        </span>
-      )}
-    </button>
+      <button
+        onClick={() => navigate(view)}
+        aria-current={current ? 'page' : undefined}
+        title={live ? `${channel.display} is live` : channel.display}
+        className={`flex-1 min-w-0 flex items-center gap-3 pl-3 py-1.5 text-sm font-mono transition-colors ${
+          current ? 'text-app-accent' : 'text-app-secondary group-hover:text-app-text'
+        }`}
+      >
+        <Tv size={16} className="shrink-0" />
+        <span className="flex-1 text-left truncate">{channel.display}</span>
+        {live && (
+          <span className="flex items-center gap-1.5 text-[10px] text-app-accent tracking-wider uppercase">
+            <span className="w-1.5 h-1.5 rounded-full bg-app-accent" />
+            live
+          </span>
+        )}
+      </button>
+      <button
+        onClick={() => hideChannel(channel.name)}
+        title={`hide ${channel.display} (bring it back from Explore)`}
+        aria-label={`hide ${channel.display}`}
+        className="w-7 h-7 shrink-0 flex items-center justify-center text-app-muted hover:text-app-text opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity"
+      >
+        <X size={12} />
+      </button>
+    </div>
   )
 }
 

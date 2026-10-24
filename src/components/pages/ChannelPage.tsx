@@ -38,7 +38,7 @@ type Listing =
  */
 export function ChannelPage({ name }: { name: string }) {
   const display = useTwitchChannels().find((c) => c.name === name)?.display ?? name
-  const liveDot = useAppStore((s) => s.online.liveChannels.has(name))
+  const liveDot = useAppStore((s) => s.online.liveStreams.has(name))
   const onlineReady = useAppStore((s) => s.ytDlp?.available !== false)
   const playTrackFromList = useAppStore((s) => s.playTrackFromList)
   const setChannelLive = useAppStore((s) => s.setChannelLive)
@@ -58,7 +58,7 @@ export function ChannelPage({ name }: { name: string }) {
     listChannel(name)
       .then((results) => {
         // a live stream comes first in the listing; the sidebar's dot follows it
-        setChannelLive(name, results[0]?.live === true)
+        setChannelLive(name, results[0]?.live ? results[0] : null)
         if (!cancelled) setCurrent({ state: 'done', results })
       })
       .catch((e) => {

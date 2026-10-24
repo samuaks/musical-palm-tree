@@ -90,7 +90,8 @@ forward stacks. `navigate(view)` (the sidebar) pushes the current page onto `bac
 the top bar walk the stacks. Opening a page clears the search box, so the page shows instead of
 results. `pages/Pages.tsx` renders the view:
 
-- **Home**: Most listened (6 tiles, "see all", "play all"), recently played (first 5, "see all")
+- **Home**: Live now (`LiveNow.tsx`: your channels streaming now, preview tiles, × hides, refresh
+  re-checks), Most listened (6 tiles, "see all", "play all"), recently played (first 5, "see all")
   and the newest library files.
 - **Most listened**: the top 50 of the last 30 days, as rows.
 - **Explore**: your Twitch channels as chips, then the YouTube/Twitch tabs and the last online
@@ -206,7 +207,11 @@ Single store at `src/store.ts`, with state grouped by source:
 - `online.downloads` — download status per `platform:videoId:kind` (state, percent, path/error)
 - `online.failedStreams` — `platform:videoId` keys whose stream couldn't be resolved the last
   time (a live channel that's offline now), so its recently played row can say so
-- `online.liveChannels` — Twitch channels (login names) the last live check found live
+- `online.liveStreams` — the last live check's streams by channel login (`OnlineSearchResult`:
+  title, preview, `live:<channel>`); `liveCheckedAt` is when it came back, and bumping
+  `liveCheck` (`checkLiveNow`) checks again now
+- `online.hiddenChannels` — Twitch channels hidden from Home, the sidebar and the live checks
+  (persisted); `hideChannel` / `unhideChannel`
 
 ### Selective subscriptions
 
@@ -229,6 +234,7 @@ App.tsx
 │ │ ├── PageHeader ← page title and subtitle
 │ │ ├── ChannelPage ← a Twitch channel: live stream + VODs (ResultRow), refresh
 │ │ ├── YourChannels (Explore) ← your Twitch channels as chips
+│ │ ├── LiveNow ← Home: your channels live now, preview tiles (× hides)
 │ │ ├── MostListenedTiles / MostListenedList (PlayLog.tsx) ← top of the last 30 days
 │ │ ├── RecentlyPlayed (PlayLog.tsx) ← RECENTLY PLAYED (filtered, foldable, `limit`)
 │ │ │ └── PlayList → Track (library) / OnlinePlayRow (online) + remove
@@ -261,7 +267,7 @@ ytdlp.rs ← yt_dlp_status / install_yt_dlp, finds/updates/runs yt-dlp
 | `search_online`     | YouTube search / Twitch channel VODs / link | async      |
 | `resolve_stream`    | yt-dlp lookup of audio (+ video) URLs      | async      |
 | `fetch_live_playlist` | Twitch live playlist for hls.js (no Origin) | async     |
-| `twitch_live_status` | Whether each channel is live (first 10, in parallel) | async |
+| `twitch_live_status` | Each channel's live stream or none (first 10, in parallel) | async |
 | `download_media`    | Download audio/video into the library      | async      |
 | `yt_dlp_status`     | yt-dlp found / installable, ffmpeg found   | sync       |
 | `install_yt_dlp`    | Download + verify yt-dlp into app data dir | async      |
@@ -356,9 +362,12 @@ stream, it returns sound only.
   path as expired URLs.
 - **Channels in the sidebar**: the Twitch channels in the play log (`twitchChannels` in
   `utils/plays.ts`: `live:<channel>` entries and VOD uploaders, most recent first, 10 at most).
-  `useTwitchLiveStatus` (mounted in `MainView`) asks `twitch_live_status` at startup, every 5
-  minutes, and when the set of channels changes; it runs the same yt-dlp live check as the channel
-  listing, one per channel in parallel, and the result is `online.liveChannels` (the LIVE dots).
+  Hidden channels (`online.hiddenChannels`) are left out everywhere, which frees their check
+  slot. `useTwitchLiveStatus` (mounted in `MainView`) asks `twitch_live_status` at startup, every
+  5 minutes, when the set of channels changes, and on `checkLiveNow`; it runs the same yt-dlp live
+  check as the channel listing, one per channel in parallel, and returns each stream (title,
+  preview) or none: `online.liveStreams`, behind the LIVE dots and Home's Live now. Explore lists
+  the hidden channels to bring them back.
 
 - The sound plays in the `<audio>` element, which stays the master: play, pause, seek, volume,
   `timeupdate` and `ended` all go through it, as for any audio track.
@@ -489,6 +498,7 @@ Stored in localStorage:
 - `playmusic-online-platform` — the selected ONLINE tab (youtube or twitch)
 - `playmusic-plays` — the play log (`plays`)
 - `playmusic-recent-collapsed` — whether the recently played section is folded
+- `playmusic-hidden-channels` — Twitch channels you hid (`online.hiddenChannels`)
 - (`playmusic-history` / `playmusic-history-collapsed`, from the old watch history, are migrated
   into those and removed at startup)
 
