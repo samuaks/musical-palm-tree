@@ -69,7 +69,13 @@ export function OnlineSection({ page = false }: { page?: boolean }) {
   const stale = searchedQuery !== query
   const channels = useTwitchChannels(SUGGESTABLE_CHANNELS)
   // Typing after a YouTube search narrows its results right away; Enter searches again
-  const refining = platform === 'youtube' && stale && searchedQuery !== null && query !== ''
+  // (a pasted link isn't refined: Enter opens it)
+  const refining =
+    platform === 'youtube' &&
+    stale &&
+    searchedQuery !== null &&
+    query !== '' &&
+    !looksLikeLink(query)
   const shown = useMemo(
     () => (refining ? refineResults(results, query) : results),
     [refining, results, query]
@@ -100,7 +106,7 @@ export function OnlineSection({ page = false }: { page?: boolean }) {
 
   return (
     <div className="pb-4">
-      <SourceHeader name="online" count={searchedQuery ? results.length : undefined}>
+      <SourceHeader name="online" count={searchedQuery ? shown.length : undefined}>
         <div className="flex items-baseline gap-3 ml-2">
           {PLATFORMS.map((p) => (
             <button
