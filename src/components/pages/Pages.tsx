@@ -6,6 +6,9 @@ import { Library, SectionHeader } from '../Library'
 import { OnlineSection } from '../OnlineSection'
 import { Track } from '../Track'
 import { PageHeader } from './PageHeader'
+import { ChannelPage } from './ChannelPage'
+import { Tv } from 'lucide-react'
+import { useTwitchChannels } from '../../hooks/useTwitchChannels'
 
 /** How many of the newest library files Home lists. */
 const RECENTLY_ADDED = 8
@@ -29,6 +32,9 @@ export function CurrentPage() {
       return <MostPage />
     case 'folder':
       return <FolderPage path={view.path} />
+    case 'channel':
+      // keyed: each channel starts fresh (its own refresh count and listing)
+      return <ChannelPage key={view.name} name={view.name} />
   }
 }
 
@@ -87,8 +93,41 @@ function ExplorePage() {
   return (
     <>
       <PageHeader title="Explore" subtitle="YouTube videos and Twitch channels, through yt-dlp." />
+      <YourChannels />
       <OnlineSection page />
     </>
+  )
+}
+
+/** The Twitch channels you watch, as chips that open their pages; a dot while live. */
+function YourChannels() {
+  const channels = useTwitchChannels()
+  const liveChannels = useAppStore((s) => s.online.liveChannels)
+  const navigate = useAppStore((s) => s.navigate)
+  if (channels.length === 0) return null
+
+  return (
+    <div className="mb-2">
+      <SectionHeader name="your twitch channels" />
+      <div className="flex flex-wrap gap-2 px-6">
+        {channels.map((c) => (
+          <button
+            key={c.name}
+            onClick={() => navigate({ page: 'channel', name: c.name })}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-app-border bg-app-surface text-xs font-mono text-app-secondary hover:border-app-accent hover:text-app-text transition-colors"
+          >
+            <Tv size={12} />
+            {c.display}
+            {liveChannels.has(c.name) && (
+              <span className="flex items-center gap-1 text-[10px] text-app-accent tracking-wider uppercase">
+                <span className="w-1.5 h-1.5 rounded-full bg-app-accent" />
+                live
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+    </div>
   )
 }
 

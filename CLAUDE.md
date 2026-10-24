@@ -49,8 +49,9 @@ download and update itself (see `src-tauri/src/ytdlp.rs`). Only installers built
 ```
 src/
   App.tsx            root shell: Sidebar, TopBar, MainView + VideoPane, PlayerBar
-  components/        Sidebar (pages, folders), TopBar (‹ ›, search, window controls), MainView,
-                     pages/ (Home, Explore, Library, Recently played, folder, search), PlayerBar, ...
+  components/        Sidebar (pages, folders, Twitch channels), TopBar (‹ ›, search, window
+                     controls), MainView, pages/ (Home, Explore, Library, Recently played, Most
+                     listened, folder, channel, search), PlayLog, PlayerBar, ...
   hooks/             useScan, useAudioPlayer, useWaveform, useDurations, useResizable, ...
   store.ts           single Zustand store
   types.ts           TS mirrors of the Rust IPC structs
@@ -60,7 +61,8 @@ src-tauri/src/
   scanner.rs         scan_media: walks ~/{Downloads,Music,Videos,Desktop,Documents}
   art.rs             cover_art: embedded or folder cover → cached thumbnail → data URL
   waveform.rs        generate_waveform: whole-track symphonia decode → ≤1024 points, cached
-  online.rs          search_online / resolve_stream for YouTube and Twitch (parse yt-dlp output)
+  online.rs          search_online / resolve_stream / fetch_live_playlist / twitch_live_status
+                     for YouTube and Twitch (parse yt-dlp output)
   download.rs        download_media: audio/video into ~/{Music,Videos}/{YouTube,Twitch}
   ytdlp.rs           finds, installs, updates and runs yt-dlp (optional, app-managed); finds ffmpeg
 ```
@@ -71,7 +73,8 @@ src-tauri/src/
   mirrors live in `src/types.ts`. **Change both sides together.** (`scanner.rs` has a test
   pinning `MediaFile`'s field names.)
 - Commands: `scan_media`, `generate_waveform`, `cover_art`, `search_online`,
-  `resolve_stream`, `fetch_live_playlist`, `download_media`, `yt_dlp_status`, `install_yt_dlp`. New commands must be added to `generate_handler!` in
+  `resolve_stream`, `fetch_live_playlist`, `twitch_live_status`, `download_media`, `yt_dlp_status`,
+  `install_yt_dlp`. New commands must be added to `generate_handler!` in
   `lib.rs`. Window permissions live in `src-tauri/capabilities/default.json`; Rust-side
   process spawning (`tauri-plugin-shell`'s `command()`) isn't scoped by capabilities.
 - Run yt-dlp only through `ytdlp::run` (or `ytdlp::run_streaming` for line-by-line output),

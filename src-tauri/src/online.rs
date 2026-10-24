@@ -173,14 +173,7 @@ pub async fn search_online(
                 let app = app.clone();
                 let url = format!("https://www.twitch.tv/{name}");
                 live_check = Some(tauri::async_runtime::spawn(async move {
-                    let args = [
-                        "--dump-json",
-                        "--no-warnings",
-                        "--no-playlist",
-                        "-f",
-                        "ba/b",
-                    ];
-                    ytdlp::run(&app, &[&args[..], &[url.as_str()]].concat()).await
+                    ytdlp::run(&app, &live_check_args(&url)).await
                 }));
                 (
                     vec![
@@ -213,6 +206,62 @@ pub async fn search_online(
         }
     }
     Ok(results)
+}
+
+/// yt-dlp arguments that print a Twitch channel's live stream (`twitch.tv/<channel>`), or exit
+/// with an error when it's offline.
+fn live_check_args(url: &str) -> Vec<&str> {
+    vec![
+        "--dump-json",
+        "--no-warnings",
+        "--no-playlist",
+        "-f",
+        "ba/b",
+        url,
+    ]
+}
+
+/// A Twitch channel's page (where its live stream is), or `None` for an invalid name.
+fn channel_url(name: &str) -> Option<String> {
+    let name = name.to_ascii_lowercase();
+    is_channel_name(&name).then(|| format!("https://www.twitch.tv/{name}"))
+}
+
+/// The most channels one `twitch_live_status` call checks (one yt-dlp each, in parallel).
+const LIVE_STATUS_LIMIT: usize = 10;
+
+/// Whether each Twitch channel is live right now, in the same order; for the sidebar's channel
+/// dots. Checks the first `LIVE_STATUS_LIMIT` in parallel (~1.8 s); the rest, invalid names and
+/// failed checks are `false`.
+#[tauri::command]
+pub async fn twitch_live_status(
+    app: tauri::AppHandle,
+    channels: Vec<String>,
+) -> Result<Vec<bool>, String> {
+    let checks: Vec<_> = channels
+        .iter()
+        .take(LIVE_STATUS_LIMIT)
+        .map(|name| {
+            let app = app.clone();
+            let name = name.to_ascii_lowercase();
+            tauri::async_runtime::spawn(async move {
+                let Some(url) = channel_url(&name) else {
+                    return false;
+                };
+                match ytdlp::run(&app, &live_check_args(&url)).await {
+                    Ok(stdout) => parse_live(&stdout, &name).is_some(),
+                    Err(_) => false, // offline, or the check failed
+                }
+            })
+        })
+        .collect();
+
+    let mut live = Vec::with_capacity(channels.len());
+    for check in checks {
+        live.push(check.await.unwrap_or(false));
+    }
+    live.resize(channels.len(), false);
+    Ok(live)
 }
 
 // What yt-dlp emits with --dump-json for a live Twitch channel (`twitch.tv/<channel>`)
@@ -810,6 +859,28 @@ mod tests {
         ] {
             assert!(!is_live_playlist_url(bad), "{bad}");
         }
+    }
+
+    #[test]
+    fn channel_urls_are_checked_and_lowercased() {
+        assert_eq!(
+            channel_url("iWobbler").as_deref(),
+            Some("https://www.twitch.tv/iwobbler")
+        );
+        assert_eq!(
+            channel_url("kai_cenat").as_deref(),
+            Some("https://www.twitch.tv/kai_cenat")
+        );
+        assert_eq!(channel_url("ab"), None); // too short
+        assert_eq!(channel_url("not a channel"), None);
+        assert_eq!(channel_url("evil/../videos"), None);
+    }
+
+    #[test]
+    fn live_check_asks_for_one_stream() {
+        let args = live_check_args("https://www.twitch.tv/iwobbler");
+        assert_eq!(args.last(), Some(&"https://www.twitch.tv/iwobbler"));
+        assert!(args.contains(&"--dump-json") && args.contains(&"--no-playlist"));
     }
 
     #[test]

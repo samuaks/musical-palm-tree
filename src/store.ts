@@ -13,7 +13,14 @@ import {
   OnlinePlay,
   PlayEntry,
 } from './types'
-import { migrateHistory, playKey, streamKey, validPlays, withPlay } from './utils/plays'
+import {
+  isChannelName,
+  migrateHistory,
+  playKey,
+  streamKey,
+  validPlays,
+  withPlay,
+} from './utils/plays'
 
 export { streamKey }
 
@@ -27,6 +34,7 @@ export type View =
   | { page: 'recent' }
   | { page: 'most' }
   | { page: 'folder'; path: string }
+  | { page: 'channel'; name: string } // a Twitch channel (login name): its live stream and VODs
 
 const VIEW_KEY = 'playmusic-view'
 /** How far back ‹ can go. */
@@ -64,6 +72,7 @@ interface OnlineState {
   searchError: string | null
   video: boolean // play the current online track with picture (back on for every new track)
   downloads: Record<string, DownloadStatus> // keyed by downloadKey(platform, videoId, kind)
+  liveChannels: Set<string> // Twitch channels (login names) found live by the last check
   // streams that couldn't be resolved the last time they were played (a live channel that's
   // offline), keyed by streamKey(platform, videoId)
   failedStreams: Set<string>
@@ -144,6 +153,8 @@ interface AppState {
   setDownload: (key: string, status: DownloadStatus) => void
   setDownloadPercent: (key: string, percent: number | null) => void
   setStreamFailed: (platform: Platform, videoId: string, failed: boolean) => void
+  setLiveChannels: (names: string[]) => void
+  setChannelLive: (name: string, live: boolean) => void
 }
 
 export const useAppStore = create<AppState>((set) => {
@@ -184,6 +195,7 @@ export const useAppStore = create<AppState>((set) => {
       video: true,
       downloads: {},
       failedStreams: new Set(),
+      liveChannels: new Set(),
     },
 
     setQuery: (query) => set({ query }),
@@ -317,6 +329,16 @@ export const useAppStore = create<AppState>((set) => {
         else failedStreams.delete(key)
         return { failedStreams }
       }),
+    setLiveChannels: (names) => setOnline(() => ({ liveChannels: new Set(names) })),
+    // a channel's own listing knows better than the last 5-minute check
+    setChannelLive: (name, live) =>
+      setOnline((s) => {
+        if (s.online.liveChannels.has(name) === live) return {}
+        const liveChannels = new Set(s.online.liveChannels)
+        if (live) liveChannels.add(name)
+        else liveChannels.delete(name)
+        return { liveChannels }
+      }),
   }
 })
 
@@ -333,6 +355,10 @@ function loadView(): View {
   if (typeof window === 'undefined') return home
   try {
     const v = JSON.parse(localStorage.getItem(VIEW_KEY) ?? 'null')
+    if (v?.page === 'channel')
+      return typeof v.name === 'string' && isChannelName(v.name)
+        ? { page: 'channel', name: v.name }
+        : home
     if (v?.page === 'folder')
       return typeof v.path === 'string' ? { page: 'folder', path: v.path } : home
     if (['home', 'explore', 'library', 'recent', 'most'].includes(v?.page)) return { page: v.page }

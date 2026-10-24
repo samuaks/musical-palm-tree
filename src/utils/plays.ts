@@ -106,3 +106,31 @@ export function migrateHistory(parsed: unknown): PlayEntry[] {
       recent: [e.watched_at as number],
     }))
 }
+
+/** A Twitch channel from the play log: its login `name` (lowercase), and how to show it. */
+export interface TwitchChannel {
+  name: string
+  display: string
+}
+
+/** Twitch login names: 3–25 letters, digits or underscores (as `is_channel_name` in online.rs). */
+export function isChannelName(name: string): boolean {
+  return /^[a-z0-9_]{3,25}$/i.test(name)
+}
+
+/**
+ * The Twitch channels in the play log, most recently played first: channels watched live
+ * (`live:<channel>`) and the channels of watched VODs.
+ */
+export function twitchChannels(log: PlayEntry[], limit: number): TwitchChannel[] {
+  const seen = new Map<string, TwitchChannel>()
+  for (const e of log) {
+    if (e.source !== 'online' || e.platform !== 'twitch') continue
+    const login = e.live ? e.video_id.slice('live:'.length) : e.uploader
+    if (!login || !isChannelName(login)) continue
+    const name = login.toLowerCase()
+    if (!seen.has(name)) seen.set(name, { name, display: e.uploader ?? login })
+    if (seen.size === limit) break
+  }
+  return [...seen.values()]
+}

@@ -25,6 +25,7 @@ pub fn run() {
             online::search_online,
             online::resolve_stream,
             online::fetch_live_playlist,
+            online::twitch_live_status,
             download::download_media,
         ])
         .run(tauri::generate_context!())
