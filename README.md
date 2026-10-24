@@ -46,8 +46,8 @@ terminal player, and is meant as a learning-friendly codebase (the repository is
 
 - Plays audio and video. Next/previous follow the list the track was picked from (library order,
   the online results, recently played or most listened), and the next track starts when one ends.
-- Stop (the square button, or `S`) ends playback and hides the player bar; it's hidden at startup
-  too, and comes back as soon as you pick a track.
+- Stop (the square button, the × at the bar's right end, or `S`) ends playback and hides the
+  player bar; it's hidden at startup too, and comes back as soon as you pick a track.
 - Cover art in the list and the player bar: the picture embedded in the file (mp3, flac, ogg, m4a),
   or else a `cover`, `folder`, `front` or `album` image (jpg/png) in the track's folder. YouTube and
   Twitch thumbnails for online tracks. Tracks without art show a music or video placeholder, and

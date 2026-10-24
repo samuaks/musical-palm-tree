@@ -12,6 +12,7 @@ import {
   Loader2,
   Video,
   VideoOff,
+  X,
 } from 'lucide-react'
 import { useAudioPlayer } from '../hooks/useAudioPlayer'
 import { useWaveform } from '../hooks/useWaveform'
@@ -208,6 +209,17 @@ export function PlayerBar() {
                 <Maximize size={14} />
               </button>
             )}
+
+            {/* closes the player: the same as stop */}
+            <div className="w-px h-4 bg-app-border" />
+            <button
+              onClick={stop}
+              className="text-app-muted hover:text-app-text transition-colors"
+              title="Close player"
+              aria-label="Close player"
+            >
+              <X size={16} />
+            </button>
           </div>
         </div>
 
