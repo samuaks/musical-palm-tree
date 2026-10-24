@@ -70,6 +70,10 @@ terminal player, and is meant as a learning-friendly codebase (the repository is
     searched). If the channel is live right now, its stream is listed on top with a **LIVE**
     badge and plays live (no seeking, no recording).
   - Pasting a YouTube or Twitch link opens that video (or channel) on either tab.
+  - Between searches, typing is fuzzy and stays on your computer: on **youtube** it narrows the
+    last results (every word has to match the title or channel, typos and any order allowed), and
+    on **twitch** it suggests channels you've watched that look like what you typed ("kai cenat"
+    finds kaicenat). Enter still runs a real search.
 - A live channel you watched is listed under **Recently played** as the channel: it plays live
   again from there, or shows **offline**. Live channels aren't ranked in Most listened.
 - Streaming goes through [yt-dlp](https://github.com/yt-dlp/yt-dlp): video up to 1080p (Twitch:

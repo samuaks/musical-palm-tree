@@ -8,10 +8,10 @@ const CHANNELS = 10
 /** How often the live dots are refreshed. */
 const LIVE_CHECK_EVERY_MS = 5 * 60 * 1000
 
-/** The Twitch channels from the play log, most recently played first. */
-export function useTwitchChannels(): TwitchChannel[] {
+/** The Twitch channels from the play log, most recently played first (the sidebar's 10). */
+export function useTwitchChannels(limit = CHANNELS): TwitchChannel[] {
   const plays = useAppStore((s) => s.plays)
-  return useMemo(() => twitchChannels(plays, CHANNELS), [plays])
+  return useMemo(() => twitchChannels(plays, limit), [plays, limit])
 }
 
 /**
