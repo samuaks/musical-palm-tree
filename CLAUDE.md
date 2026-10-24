@@ -94,8 +94,8 @@ src-tauri/src/
   are defined in the `@theme` block of `src/App.css`.
 - Shared state goes in the Zustand store, not React Context. It's grouped by source:
   `library.*` (local files) and `online.*` (platform tab, search results, downloads, video
-  setting, watch history), with the search box's `query`, the page (`nav`) and playback state at
-  the root.
+  setting), with the search box's `query`, the page (`nav`), the play log (`plays`) and
+  playback state at the root.
 - Subscribe selectively: `useAppStore((s) => s.library.dirs)`, not the whole store.
 - Pages: the sidebar calls `navigate(view)` (`nav.view`, with ‹ › stacks); a new page is a `View`
   variant in `store.ts` plus a case in `pages/Pages.tsx`. While the search box has text, search

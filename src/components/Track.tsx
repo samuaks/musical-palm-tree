@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { ReactNode, useRef } from 'react'
 import { MediaFile } from '../types'
 import { isVideo } from '../constants'
 import { selectCurrentTrack, useAppStore } from '../store'
@@ -13,6 +13,12 @@ interface TrackProps {
   file: MediaFile
   dirName: string
   albumName: string | null
+  /** Plays something other than the whole library from here (e.g. the play log's list). */
+  onPlay?: () => void
+  /** Replaces "added …" after the subtitle (e.g. "played 2h ago"). */
+  note?: string
+  /** Buttons on the right, like `TrackRow`'s. */
+  actions?: ReactNode
 }
 
 function highlight(text: string, query: string) {
@@ -29,7 +35,7 @@ function highlight(text: string, query: string) {
 }
 
 /** A library track: cover (or a music/video placeholder), name, `album · folder · added`. */
-export function Track({ file, dirName, albumName }: TrackProps) {
+export function Track({ file, dirName, albumName, onPlay, note, actions }: TrackProps) {
   const currentTrack = useAppStore(selectCurrentTrack)
 
   const flatTracks = useLocalFlatTracks()
@@ -46,9 +52,10 @@ export function Track({ file, dirName, albumName }: TrackProps) {
   const video = isVideo(file.ext)
   const subtitle = [albumName, dirName].filter(Boolean).join(' · ')
   // The date always shows; album and folder shorten first
-  const added = formatRelative(file.created_at) || undefined
+  const added = note ?? (formatRelative(file.created_at) || undefined)
 
   function handleClick() {
+    if (onPlay) return onPlay()
     const idx = flatTracks.findIndex((t) => t.path === file.path)
     if (idx < 0) return
     playTrackFromlist(flatTracks, idx)
@@ -73,6 +80,7 @@ export function Track({ file, dirName, albumName }: TrackProps) {
       subtitleEnd={added}
       duration={formatDuration(duration)}
       onClick={handleClick}
+      actions={actions}
     />
   )
 }

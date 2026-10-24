@@ -83,11 +83,16 @@ export interface ResolvedStream {
   live: boolean // play through hls.js (see src/utils/liveHls.ts)
 }
 
-/**
- * An online item that was watched (`online.history`, persisted). Frontend-only: just what's
- * needed to list it and play it again.
- */
-export interface HistoryEntry {
+/** A library file in the play log: found again in the library by its path. */
+export interface LocalPlay {
+  source: 'local'
+  path: string
+  name: string // file name, shown if the file is no longer in the library
+}
+
+/** An online item in the play log: just what's needed to list it and play it again. */
+export interface OnlinePlay {
+  source: 'online'
   platform: Platform
   video_id: string // `live:<channel>` for a live stream: playing it again watches the channel now
   title: string // for a live stream, the stream's title when it was watched
@@ -95,7 +100,15 @@ export interface HistoryEntry {
   thumbnail: string | null
   duration_secs: number
   live: boolean
-  watched_at: number // Unix ms
+}
+
+/**
+ * Something that was played for 30 s (`plays`, persisted). Frontend-only. `recent` holds the
+ * times it was played in the last 30 days, which rank Most listened.
+ */
+export type PlayEntry = (LocalPlay | OnlinePlay) & {
+  last_played: number // Unix ms
+  recent: number[] // Unix ms, oldest first, only the last 30 days
 }
 
 /** Mirrors `ytdlp::Status` in src-tauri/src/ytdlp.rs. */
