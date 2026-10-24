@@ -1,6 +1,6 @@
-import { ReactNode, useState } from 'react'
+import { ReactNode, useMemo, useState } from 'react'
 import { listen } from '@tauri-apps/api/event'
-import { Loader2, AlertCircle, Download, Music, Film, Check, Search } from 'lucide-react'
+import { Loader2, AlertCircle, Download, Music, Film, Check, Search, Tv } from 'lucide-react'
 import { selectCurrentTrack, useAppStore } from '../store'
 import {
   downloadKey,
@@ -17,8 +17,14 @@ import { SourceHeader } from './SourceHeader'
 import { TrackRow } from './TrackRow'
 import { TrackCover } from './TrackCover'
 import { formatDuration, formatRelative, formatViews } from '../utils/format'
+import { refineResults, suggestChannels } from '../utils/fuzzyOnline'
+import { useTwitchChannels } from '../hooks/useTwitchChannels'
 
 const PLATFORMS: Platform[] = ['youtube', 'twitch']
+/** How many of your channels the Twitch tab suggests while you type. */
+const CHANNEL_SUGGESTIONS = 5
+/** Channels from the play log the suggestions look through. */
+const SUGGESTABLE_CHANNELS = 50
 
 /** A pasted link is opened directly (see `classify` in online.rs), whichever tab is active. */
 function looksLikeLink(query: string): boolean {
@@ -47,7 +53,8 @@ function wording(platform: Platform, query: string) {
  * The ONLINE part of the search results, shown while the search box isn't empty, and the Explore
  * page (`page`), which keeps showing the last search after the box is cleared. Tabs pick YouTube
  * (text search) or Twitch (a channel's recent VODs). Searched only on Enter (or by clicking the
- * search row), so filtering the library never calls yt-dlp.
+ * search row), so filtering the library never calls yt-dlp. In between, typing refines the last
+ * YouTube results fuzzily, and on the Twitch tab suggests channels you've watched.
  */
 export function OnlineSection({ page = false }: { page?: boolean }) {
   const typed = useAppStore((s) => s.query.trim())
@@ -59,6 +66,28 @@ export function OnlineSection({ page = false }: { page?: boolean }) {
   const playTrackFromList = useAppStore((s) => s.playTrackFromList)
   const ytDlp = useAppStore((s) => s.ytDlp)
   const query = typed || (page ? (searchedQuery ?? '') : '')
+  const stale = searchedQuery !== query
+  const channels = useTwitchChannels(SUGGESTABLE_CHANNELS)
+  // Typing after a YouTube search narrows its results right away; Enter searches again
+  // (a pasted link isn't refined: Enter opens it)
+  const refining =
+    platform === 'youtube' &&
+    stale &&
+    searchedQuery !== null &&
+    query !== '' &&
+    !looksLikeLink(query)
+  const shown = useMemo(
+    () => (refining ? refineResults(results, query) : results),
+    [refining, results, query]
+  )
+  // A channel name typed on the Twitch tab: the channels you've watched that look like it
+  const suggestions = useMemo(
+    () =>
+      platform === 'twitch' && stale && query
+        ? suggestChannels(channels, query, CHANNEL_SUGGESTIONS)
+        : [],
+    [platform, stale, query, channels]
+  )
 
   // Hidden only where yt-dlp is missing and the app can't install it.
   if (ytDlp && !ytDlp.available && !ytDlp.can_install) {
@@ -67,18 +96,17 @@ export function OnlineSection({ page = false }: { page?: boolean }) {
   if (!query && !page) return null
 
   function handlePlay(result: OnlineSearchResult) {
-    const idx = results.findIndex((r) => r.video_id === result.video_id)
+    const idx = shown.findIndex((r) => r.video_id === result.video_id)
     if (idx < 0) return
-    playTrackFromList(results.map(resultToTrack), idx)
+    playTrackFromList(shown.map(resultToTrack), idx)
   }
 
   const searching = searchState === 'searching'
-  const stale = searchedQuery !== query
   const words = wording(platform, query)
 
   return (
     <div className="pb-4">
-      <SourceHeader name="online" count={searchedQuery ? results.length : undefined}>
+      <SourceHeader name="online" count={searchedQuery ? shown.length : undefined}>
         <div className="flex items-baseline gap-3 ml-2">
           {PLATFORMS.map((p) => (
             <button
@@ -126,6 +154,14 @@ export function OnlineSection({ page = false }: { page?: boolean }) {
             )
           )}
 
+          {!searching && suggestions.length > 0 && (
+            <div className="flex flex-col">
+              {suggestions.map((c) => (
+                <ChannelSuggestion key={c.name} name={c.name} display={c.display} />
+              ))}
+            </div>
+          )}
+
           {searchState === 'error' && (
             <StatusRow>
               <AlertCircle size={14} className="shrink-0" />
@@ -139,9 +175,17 @@ export function OnlineSection({ page = false }: { page?: boolean }) {
 
           {results.length > 0 && (
             <>
-              {stale && <StatusRow>results for "{searchedQuery}"</StatusRow>}
+              {refining ? (
+                <StatusRow>
+                  {shown.length > 0
+                    ? `${shown.length} of ${results.length} results for "${searchedQuery}" match`
+                    : `none of the results for "${searchedQuery}" match: press enter to search`}
+                </StatusRow>
+              ) : (
+                stale && <StatusRow>results for "{searchedQuery}"</StatusRow>
+              )}
               <div className="flex flex-col">
-                {results.map((r) => (
+                {shown.map((r) => (
                   <ResultRow key={r.video_id} result={r} onPlay={() => handlePlay(r)} />
                 ))}
               </div>
@@ -150,6 +194,30 @@ export function OnlineSection({ page = false }: { page?: boolean }) {
         </>
       )}
     </div>
+  )
+}
+
+/** One of your channels that looks like what's typed on the Twitch tab; opens its page. */
+function ChannelSuggestion({ name, display }: { name: string; display: string }) {
+  const navigate = useAppStore((s) => s.navigate)
+  const live = useAppStore((s) => s.online.liveChannels.has(name))
+  return (
+    <button
+      onClick={() => navigate({ page: 'channel', name })}
+      className="w-full flex items-center gap-3 px-6 py-2 text-left text-xs font-mono text-app-secondary hover:bg-app-hover hover:text-app-text transition-colors"
+    >
+      <Tv size={14} className="shrink-0" />
+      <span className="truncate">
+        open <span className="text-app-text">{display}</span>
+      </span>
+      {live && (
+        <span className="flex items-center gap-1 text-[10px] text-app-accent tracking-wider uppercase">
+          <span className="w-1.5 h-1.5 rounded-full bg-app-accent" />
+          live
+        </span>
+      )}
+      <span className="ml-auto text-app-muted">your channel</span>
+    </button>
   )
 }
 

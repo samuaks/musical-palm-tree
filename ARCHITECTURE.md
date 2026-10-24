@@ -118,9 +118,14 @@ clears it, back to the page.
   while typing, so local lookups never call yt-dlp.
 - **Enter** (or clicking that row): `searchOnlineNow(query)` in `src/api/online.ts` runs
   `search_online(query, platform)` and stores the results with the query they belong to
-  (`searchedQuery`). If the query changes afterwards, the old results stay under a
-  `results for "…"` label until the next search. A newer search always wins over a slower
-  older one, and switching tabs (`selectPlatform`) drops the results.
+  (`searchedQuery`). If the query changes afterwards, the old results stay until the next
+  search: on the **youtube** tab narrowed fuzzily to the ones that still fit the query
+  (`refineResults` in `utils/fuzzyOnline.ts`: Fuse, every word must match the title or channel,
+  YouTube's order kept; "n of m results for "…" match"); on **twitch** under a
+  `results for "…"` label, with the channels you've watched that look like the typed name
+  (`suggestChannels`, spaces ignored) offered above them as links to their pages. Nothing here
+  calls yt-dlp or the network. A newer search always wins over a slower older one, and switching
+  tabs (`selectPlatform`) drops the results.
 - **Clearing** the box (or `Esc`, or opening a page) keeps the online results, so the Explore page
   still shows the last search; switching tabs or a new search replaces them.
 
